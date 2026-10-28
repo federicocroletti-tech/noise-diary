@@ -36,7 +36,7 @@ jobs:
       - name: Upload static artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist/noise-diary-app
+          path: ./dist/noise-diary-app/browser
 
   deploy:
     needs: build
