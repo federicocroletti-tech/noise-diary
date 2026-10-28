@@ -1,0 +1,196 @@
+﻿<div class="app-shell">
+  <header class="topbar">
+    <div class="brand-block">
+      <span class="eyebrow">Local-first · privacy-first</span>
+      <h1>{{ title() }}</h1>
+    </div>
+
+    <div class="header-actions">
+      <button type="button" class="secondary" (click)="toggleForm()">
+        {{ showForm() ? 'Nascondi modulo' : 'Nuovo episodio' }}
+      </button>
+      <button type="button" class="primary" (click)="downloadExport()">Esporta JSON</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="overview panel">
+      <div class="stat-card">
+        <span class="label">Eventi</span>
+        <strong>{{ events().length }}</strong>
+      </div>
+      <div class="stat-card">
+        <span class="label">Media percepita</span>
+        <strong>{{ events().length ? (events().reduce((sum, event) => sum + event.perceivedIntensity, 0) / events().length).toFixed(1) : '0.0' }}</strong>
+      </div>
+      <div class="stat-card highlight">
+        <span class="label">Stato</span>
+        <strong>Offline</strong>
+      </div>
+    </section>
+
+    <section class="panel form-panel" *ngIf="showForm()">
+      <div class="section-heading">
+        <h2>Nuovo episodio</h2>
+        <span>Riservato al dispositivo dell'utente</span>
+      </div>
+
+      <form class="event-form" (submit)="$event.preventDefault(); submitDraft()">
+        <label>
+          <span>Luogo</span>
+          <input type="text" [value]="draft().locationLabel" (input)="onFieldChange('locationLabel', $any($event.target).value)" placeholder="Es. Cucina, stanza notte" />
+        </label>
+
+        <div class="two-columns">
+          <label>
+            <span>Stanza</span>
+            <input type="text" [value]="draft().room" (input)="onFieldChange('room', $any($event.target).value)" />
+          </label>
+
+          <label>
+            <span>Tipo evento</span>
+            <select [value]="draft().eventType" (change)="onFieldChange('eventType', $any($event.target).value)">
+              <option *ngFor="let option of eventTypeOptions" [value]="option">{{ option }}</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="two-columns">
+          <label>
+            <span>Intensità percepita (1–10)</span>
+            <input type="range" min="1" max="10" [value]="draft().perceivedIntensity" (input)="onFieldChange('perceivedIntensity', +$any($event.target).value)" />
+            <small>{{ draft().perceivedIntensity }}/10</small>
+          </label>
+
+          <label>
+            <span>Continuità</span>
+            <select [value]="draft().continuityType" (change)="onFieldChange('continuityType', $any($event.target).value)">
+              <option value="continuous">continua</option>
+              <option value="intermittent">intermittente</option>
+              <option value="single">singola</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          <span>Sorgente sospetta</span>
+          <input type="text" [value]="draft().suspectedSource" (input)="onFieldChange('suspectedSource', $any($event.target).value)" />
+        </label>
+
+        <label>
+          <span>Descrizione</span>
+          <textarea rows="3" [value]="draft().description" (input)="onFieldChange('description', $any($event.target).value)" placeholder="Descrivi la percezione soggettiva e il contesto."></textarea>
+        </label>
+
+        <label>
+          <span>Note</span>
+          <textarea rows="2" [value]="draft().notes" (input)="onFieldChange('notes', $any($event.target).value)" placeholder="Eventi e osservazioni rilevanti."></textarea>
+        </label>
+
+        <div class="two-columns">
+          <label>
+            <span>Tags</span>
+            <input type="text" [value]="draft().tags" (input)="onFieldChange('tags', $any($event.target).value)" />
+          </label>
+
+          <label>
+            <span>Effetti percepiti</span>
+            <input type="text" [value]="draft().perceivedEffects" (input)="onFieldChange('perceivedEffects', $any($event.target).value)" />
+          </label>
+        </div>
+
+        <div class="two-columns">
+          <label>
+            <span>Finestre</span>
+            <input type="text" [value]="draft().windowsState" (input)="onFieldChange('windowsState', $any($event.target).value)" />
+          </label>
+
+          <label>
+            <span>Porta</span>
+            <input type="text" [value]="draft().doorsState" (input)="onFieldChange('doorsState', $any($event.target).value)" />
+          </label>
+        </div>
+
+        <button type="submit" class="primary submit">Salva evento</button>
+      </form>
+    </section>
+
+    <section class="panel list-panel">
+      <div class="section-heading compact">
+        <h2>Diario</h2>
+        <div class="filters">
+          <input
+            type="search"
+            [value]="search()"
+            (input)="search.set($any($event.target).value)"
+            placeholder="Cerca evento"
+            aria-label="Cerca evento"
+          />
+          <select [value]="sortMode()" (change)="sortMode.set($any($event.target).value)">
+            <option value="recent">Più recenti</option>
+            <option value="intensity">Intensità</option>
+            <option value="room">Stanza</option>
+          </select>
+        </div>
+      </div>
+
+      <ul class="event-list" *ngIf="filteredEvents().length; else emptyState">
+        <li *ngFor="let event of filteredEvents()" [class.active]="event.id === selectedEvent()?.id" (click)="selectEvent(event.id)">
+          <div class="event-header">
+            <strong>{{ event.locationLabel }}</strong>
+            <span>{{ event.eventType }}</span>
+          </div>
+          <small>{{ event.room }} · {{ event.startedAt | date: 'dd MMM yyyy, HH:mm' }}</small>
+          <p>{{ event.description }}</p>
+        </li>
+      </ul>
+
+      <ng-template #emptyState>
+        <p class="empty-state">Nessun evento trovato. Aggiungi un record per iniziare il diario.</p>
+      </ng-template>
+    </section>
+
+    <aside class="panel detail-panel" *ngIf="selectedEvent() as event">
+      <div class="section-heading compact">
+        <h2>Dettaglio</h2>
+        <span class="status-badge">{{ event.status }}</span>
+      </div>
+
+      <div class="detail-summary">
+        <div class="tag-row">
+          <span class="tag">{{ event.eventType }}</span>
+          <span class="tag secondary">{{ event.continuityType }}</span>
+        </div>
+        <h3>{{ event.locationLabel }}</h3>
+        <p>{{ event.description }}</p>
+      </div>
+
+      <div class="meta-grid">
+        <div><span>Intensità</span><strong>{{ event.perceivedIntensity }}/10</strong></div>
+        <div><span>Sorgente</span><strong>{{ event.suspectedSource }}</strong></div>
+        <div><span>Finestra</span><strong>{{ event.windowsState ?? 'non indicata' }}</strong></div>
+        <div><span>Porta</span><strong>{{ event.doorsState ?? 'non indicata' }}</strong></div>
+      </div>
+
+      <div class="chart-panel">
+        <h4>Analisi frequenze (informativa)</h4>
+        <div class="frequency-chart" aria-label="Analisi frequenze informativa">
+          <div class="bar" *ngFor="let band of analysisBands()" [style.height.%]="band.amplitude">
+            <span>{{ band.label }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes-block">
+        <h4>Note</h4>
+        <ul>
+          <li *ngFor="let effect of event.perceivedEffects">{{ effect }}</li>
+        </ul>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="disclaimer">
+    <strong>Disclaimer:</strong> le misurazioni sono indicative, non calibrate, dipendenti dal microfono del dispositivo e non equivalenti a rilevazioni fonometriche professionali.
+  </footer>
+</div>
