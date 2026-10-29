@@ -6,7 +6,7 @@
     "start": "ng serve --host 0.0.0.0 --port 4200",
     "build": "ng build --configuration production --base-href ./",
     "watch": "ng build --watch --configuration development --base-href ./",
-    "test": "echo \"No automated browser tests configured for this MVP. Use npm run build for verification.\""
+    "test": "ng test --watch=false"
   },
   "private": true,
   "packageManager": "npm@10.9.8",
