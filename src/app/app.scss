@@ -293,6 +293,150 @@ small {
   margin-bottom: 18px;
 }
 
+.audio-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 18px 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.audio-heading,
+.audio-file-heading,
+.audio-file-actions,
+.audio-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.audio-heading h4,
+.audio-heading p,
+.audio-consent,
+.audio-status,
+.audio-error,
+.empty-audio {
+  margin: 0;
+}
+
+.audio-heading h4 {
+  font-size: 1rem;
+}
+
+.audio-heading p,
+.audio-consent,
+.audio-file-heading span,
+.audio-meta,
+.empty-audio {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.audio-consent {
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+}
+
+.audio-kind {
+  max-width: 260px;
+}
+
+.recording-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.15);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.recording-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.16);
+}
+
+.audio-controls {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+button.danger {
+  color: #fee2e2;
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(127, 29, 29, 0.4);
+}
+
+.audio-status,
+.audio-error {
+  font-size: 0.82rem;
+}
+
+.audio-status {
+  color: var(--primary);
+}
+
+.audio-error {
+  color: #fecaca;
+}
+
+.audio-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.audio-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.audio-list audio {
+  width: 100%;
+}
+
+.audio-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.audio-list details {
+  color: var(--muted);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.audio-list details p {
+  margin: 8px 0;
+}
+
+.audio-file-actions button {
+  padding: 0.5rem 0.8rem;
+  font-size: 0.78rem;
+}
+
+.audio-kind select:disabled {
+  opacity: 0.7;
+}
+
 .tag-row {
   display: flex;
   flex-wrap: wrap;

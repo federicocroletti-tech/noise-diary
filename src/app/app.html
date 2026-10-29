@@ -165,6 +165,104 @@
         <p>{{ event.description }}</p>
       </div>
 
+      <section class="audio-section" aria-labelledby="audio-heading">
+        <div class="audio-heading">
+          <div>
+            <h4 id="audio-heading">Registrazioni audio</h4>
+            <p>Acquisite dal microfono e conservate solo in questo browser.</p>
+          </div>
+          <span *ngIf="recordingActive()" class="recording-indicator" role="status">
+            <span class="recording-dot"></span>
+            {{ recordingPaused() ? 'In pausa' : 'Registrazione attiva' }}
+            · {{ formatDuration(recordingDurationMs()) }}
+          </span>
+        </div>
+
+        <label class="audio-kind">
+          <span>Tipo di registrazione</span>
+          <select
+            [value]="recordingKind()"
+            [disabled]="recordingActive()"
+            (change)="setRecordingKind($any($event.target).value)"
+          >
+            <option value="event">Evento</option>
+            <option value="background">Rumore di fondo</option>
+          </select>
+        </label>
+
+        <p class="audio-consent">
+          La registrazione inizia solo dopo aver premuto il pulsante. Evita di acquisire conversazioni o persone non necessarie.
+          Limite massimo: {{ maxRecordingSeconds / 60 }} minuti o 50 MB. Nessun audio viene caricato online.
+        </p>
+
+        <div class="audio-controls">
+          <button
+            *ngIf="!recordingActive()"
+            type="button"
+            class="primary"
+            (click)="startAudioRecording()"
+            [attr.aria-label]="'Avvia registrazione per ' + event.locationLabel"
+          >
+            Avvia registrazione
+          </button>
+          <ng-container *ngIf="recordingActive()">
+            <button
+              *ngIf="!recordingPaused() && recordingPauseSupported()"
+              type="button"
+              class="secondary"
+              (click)="pauseAudioRecording()"
+              aria-label="Metti in pausa la registrazione"
+            >
+              Pausa
+            </button>
+            <button
+              *ngIf="recordingPaused()"
+              type="button"
+              class="secondary"
+              (click)="resumeAudioRecording()"
+              aria-label="Riprendi la registrazione"
+            >
+              Riprendi
+            </button>
+            <button type="button" class="danger" (click)="stopAudioRecording()" aria-label="Ferma e salva la registrazione">
+              Ferma e salva
+            </button>
+          </ng-container>
+        </div>
+
+        <p *ngIf="audioStatus()" class="audio-status" role="status" aria-live="polite">{{ audioStatus() }}</p>
+        <p *ngIf="audioError()" class="audio-error" role="alert">{{ audioError() }}</p>
+
+        <ul class="audio-list" *ngIf="audioClips().length; else noAudio">
+          <li *ngFor="let clip of audioClips()">
+            <div class="audio-file-heading">
+              <strong>{{ clip.kind === 'background' ? 'Rumore di fondo' : 'Evento' }}</strong>
+              <span>{{ clip.createdAt | date: 'dd MMM yyyy, HH:mm' }}</span>
+            </div>
+            <audio controls preload="none" [src]="getAudioUrl(clip.id)">
+              Il browser non supporta la riproduzione audio.
+            </audio>
+            <div class="audio-meta">
+              <span>{{ formatDuration(clip.durationMs) }}</span>
+              <span>{{ (clip.sizeBytes / 1024 / 1024).toFixed(2) }} MB</span>
+              <span>{{ clip.mimeType }}</span>
+            </div>
+            <details>
+              <summary>Integrità e provenienza</summary>
+              <p>SHA-256: <code>{{ clip.sha256 }}</code></p>
+              <p>Origine: microfono · piattaforma: {{ clip.device.platform || 'non disponibile' }}</p>
+            </details>
+            <div class="audio-file-actions">
+              <button type="button" class="secondary" (click)="downloadAudioClip(clip)">Scarica copia</button>
+              <button type="button" class="danger" (click)="deleteAudioClip(clip)">Elimina</button>
+            </div>
+          </li>
+        </ul>
+        <ng-template #noAudio>
+          <p class="empty-audio">Nessuna registrazione associata a questo episodio.</p>
+        </ng-template>
+      </section>
+
       <div class="meta-grid">
         <div><span>Intensità</span><strong>{{ event.perceivedIntensity }}/10</strong></div>
         <div><span>Sorgente</span><strong>{{ event.suspectedSource }}</strong></div>

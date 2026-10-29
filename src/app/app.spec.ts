@@ -20,4 +20,15 @@ describe('App', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('h1')?.textContent).toContain('Diario Rumore');
   });
+
+  it('should show the explicit local audio recording controls for the selected event', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Registrazioni audio');
+    expect(compiled.textContent).toContain('Nessun audio viene caricato online');
+    expect(compiled.querySelector('button[aria-label^="Avvia registrazione per"]')).not.toBeNull();
+  });
 });

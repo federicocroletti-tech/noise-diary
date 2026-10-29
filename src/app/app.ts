@@ -1,5 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, OnDestroy, signal } from '@angular/core';
+import { AudioClip, AudioClipKind } from './audio/models/audio-clip.model';
+import { AudioClipRepository } from './audio/audio-clip.repository';
+import {
+  AudioRecordingService,
+  formatRecordingError,
+  MAX_RECORDING_DURATION_SECONDS,
+} from './audio/audio-recording.service';
 import { AudioAnalysisService } from './services/audio-analysis.service';
 import { NoiseStorageService } from './services/noise-storage.service';
 import { NoiseEvent, NoiseEventDraft, NoiseEventType } from './domain/noise-event.model';
@@ -29,7 +36,7 @@ const EMPTY_DRAFT: NoiseEventDraft = {
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
-export class App {
+export class App implements OnDestroy {
   protected readonly title = signal('Diario Rumore');
   protected readonly showForm = signal(true);
   protected readonly search = signal('');
@@ -37,6 +44,16 @@ export class App {
   protected readonly draft = signal<NoiseEventDraft>({ ...EMPTY_DRAFT });
   protected readonly events = signal<NoiseEvent[]>([]);
   protected readonly selectedEventId = signal<string | null>(null);
+  protected readonly audioClips = signal<AudioClip[]>([]);
+  protected readonly audioUrls = signal<Record<string, string>>({});
+  protected readonly audioError = signal('');
+  protected readonly audioStatus = signal('');
+  protected readonly recordingKind = signal<AudioClipKind>('event');
+  protected readonly recordingActive = signal(false);
+  protected readonly recordingPaused = signal(false);
+  protected readonly recordingPauseSupported = signal(false);
+  protected readonly recordingDurationMs = signal(0);
+  protected readonly maxRecordingSeconds = MAX_RECORDING_DURATION_SECONDS;
 
   protected readonly filteredEvents = computed(() => {
     const query = this.search().trim().toLowerCase();
@@ -95,8 +112,15 @@ export class App {
   constructor(
     private readonly storageService: NoiseStorageService,
     private readonly audioAnalysisService: AudioAnalysisService,
+    private readonly audioRecordingService: AudioRecordingService,
+    private readonly audioClipRepository: AudioClipRepository,
   ) {
     this.initialize();
+  }
+
+  ngOnDestroy(): void {
+    this.audioRecordingService.cancel();
+    this.revokeAudioUrls();
   }
 
   protected toggleForm(): void {
@@ -150,7 +174,132 @@ export class App {
   }
 
   protected selectEvent(id: string): void {
+    if (this.recordingActive()) {
+      this.audioError.set('Ferma la registrazione prima di cambiare episodio.');
+      return;
+    }
     this.selectedEventId.set(id);
+    this.audioError.set('');
+    void this.loadAudioForEvent(id);
+  }
+
+  protected setRecordingKind(kind: AudioClipKind): void {
+    this.recordingKind.set(kind);
+  }
+
+  protected async startAudioRecording(): Promise<void> {
+    const event = this.selectedEvent();
+    if (!event) {
+      this.audioError.set('Salva o seleziona un episodio prima di avviare una registrazione.');
+      return;
+    }
+
+    this.audioError.set('');
+    this.audioStatus.set('');
+    this.recordingDurationMs.set(0);
+    try {
+      await this.audioRecordingService.start(
+        event.id,
+        this.recordingKind(),
+        (duration) => {
+          this.recordingDurationMs.set(duration);
+          if (duration >= this.maxRecordingSeconds * 1000 && this.recordingActive()) {
+            void this.stopAudioRecording();
+          }
+        },
+        (error) => {
+          this.audioError.set(formatRecordingError(error));
+          this.recordingActive.set(false);
+          this.recordingPaused.set(false);
+        },
+      );
+      this.recordingActive.set(true);
+      this.recordingPauseSupported.set(this.audioRecordingService.supportsPause);
+      this.audioStatus.set('Registrazione attiva: il microfono sta acquisendo audio localmente.');
+    } catch (error) {
+      this.audioError.set(formatRecordingError(error));
+      this.recordingActive.set(false);
+      this.recordingPauseSupported.set(false);
+    }
+  }
+
+  protected pauseAudioRecording(): void {
+    this.audioRecordingService.pause();
+    this.recordingPaused.set(this.audioRecordingService.isPaused);
+    this.audioStatus.set(this.recordingPaused() ? 'Registrazione in pausa.' : 'Pausa non supportata.');
+  }
+
+  protected resumeAudioRecording(): void {
+    this.audioRecordingService.resume();
+    this.recordingPaused.set(false);
+    this.audioStatus.set('Registrazione ripresa.');
+  }
+
+  protected async stopAudioRecording(): Promise<void> {
+    try {
+      const clip = await this.audioRecordingService.stop();
+      this.addClipToEvent(clip);
+      await this.loadAudioForEvent(clip.eventId);
+      this.audioStatus.set('Registrazione salvata solo su questo dispositivo.');
+    } catch (error) {
+      this.audioError.set(formatRecordingError(error));
+    } finally {
+      this.recordingActive.set(false);
+      this.recordingPaused.set(false);
+      this.recordingPauseSupported.set(false);
+    }
+  }
+
+  protected async deleteAudioClip(clip: AudioClip): Promise<void> {
+    if (!confirm(`Eliminare definitivamente la registrazione "${clip.fileName}" da questo dispositivo?`)) {
+      return;
+    }
+
+    try {
+      await this.audioClipRepository.delete(clip.id);
+      const event = this.events().find((item) => item.id === clip.eventId);
+      if (event) {
+        const updatedEvent = {
+          ...event,
+          attachmentIds: event.attachmentIds.filter((id) => id !== clip.id),
+          backgroundRecordingId:
+            event.backgroundRecordingId === clip.id ? undefined : event.backgroundRecordingId,
+          updatedAt: new Date().toISOString(),
+        };
+        const updatedEvents = this.events().map((item) =>
+          item.id === updatedEvent.id ? updatedEvent : item,
+        );
+        this.events.set(updatedEvents);
+        this.storageService.saveEvents(updatedEvents);
+      }
+      this.revokeAudioUrl(clip.id);
+      this.audioClips.update((clips) => clips.filter((item) => item.id !== clip.id));
+      this.audioStatus.set('Registrazione eliminata dal dispositivo.');
+    } catch (error) {
+      this.audioError.set(formatRecordingError(error));
+    }
+  }
+
+  protected downloadAudioClip(clip: AudioClip): void {
+    const url = this.getAudioUrl(clip.id);
+    if (!url) {
+      return;
+    }
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = clip.fileName;
+    anchor.click();
+  }
+
+  protected getAudioUrl(clipId: string): string {
+    return this.audioUrls()[clipId] ?? '';
+  }
+
+  protected formatDuration(durationMs: number): string {
+    const totalSeconds = Math.floor(durationMs / 1000);
+    return `${Math.floor(totalSeconds / 60)
+      .toString()
+      .padStart(2, '0')}:${(totalSeconds % 60).toString().padStart(2, '0')}`;
   }
 
   protected downloadExport(): void {
@@ -175,5 +324,62 @@ export class App {
     this.events.set(initialEvents);
     this.selectedEventId.set(initialEvents[0]?.id ?? null);
     this.storageService.saveEvents(initialEvents);
+    if (initialEvents[0]) {
+      void this.loadAudioForEvent(initialEvents[0].id);
+    }
+  }
+
+  private async loadAudioForEvent(eventId: string): Promise<void> {
+    this.revokeAudioUrls();
+    this.audioClips.set([]);
+    try {
+      const clips = await this.audioClipRepository.listByEvent(eventId);
+      if (this.selectedEventId() !== eventId) {
+        return;
+      }
+      const urls: Record<string, string> = {};
+      for (const clip of clips) {
+        urls[clip.id] = URL.createObjectURL(clip.blob);
+      }
+      this.audioUrls.set(urls);
+      this.audioClips.set(clips);
+    } catch (error) {
+      this.audioError.set(formatRecordingError(error));
+    }
+  }
+
+  private addClipToEvent(clip: AudioClip): void {
+    const event = this.events().find((item) => item.id === clip.eventId);
+    if (!event) {
+      return;
+    }
+
+    const updatedEvent = {
+      ...event,
+      attachmentIds: [...new Set([...event.attachmentIds, clip.id])],
+      backgroundRecordingId: clip.kind === 'background' ? clip.id : event.backgroundRecordingId,
+      updatedAt: new Date().toISOString(),
+    };
+    const updatedEvents = this.events().map((item) => (item.id === event.id ? updatedEvent : item));
+    this.events.set(updatedEvents);
+    this.storageService.saveEvents(updatedEvents);
+  }
+
+  private revokeAudioUrl(clipId: string): void {
+    const url = this.audioUrls()[clipId];
+    if (url) {
+      URL.revokeObjectURL(url);
+      this.audioUrls.update((current) => {
+        const { [clipId]: _removed, ...remaining } = current;
+        return remaining;
+      });
+    }
+  }
+
+  private revokeAudioUrls(): void {
+    for (const url of Object.values(this.audioUrls())) {
+      URL.revokeObjectURL(url);
+    }
+    this.audioUrls.set({});
   }
 }
