@@ -2,12 +2,13 @@ import { Injectable } from '@angular/core';
 import { AudioClip, AudioClipMetadata } from './models/audio-clip.model';
 
 const DATABASE_NAME = 'noise-diary';
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const STORE_NAME = 'audio-clips';
 
 @Injectable({ providedIn: 'root' })
 export class AudioClipRepository {
   private databasePromise?: Promise<IDBDatabase>;
+  private database?: IDBDatabase;
 
   async save(clip: AudioClip): Promise<void> {
     const database = await this.openDatabase();
@@ -34,6 +35,12 @@ export class AudioClipRepository {
     await this.runTransaction(database, 'readwrite', (store) => store.delete(id));
   }
 
+  close(): void {
+    this.database?.close();
+    this.database = undefined;
+    this.databasePromise = undefined;
+  }
+
   private openDatabase(): Promise<IDBDatabase> {
     if (typeof indexedDB === 'undefined') {
       return Promise.reject(new Error('IndexedDB non è disponibile in questo browser.'));
@@ -47,8 +54,15 @@ export class AudioClipRepository {
           const store = database.createObjectStore(STORE_NAME, { keyPath: 'id' });
           store.createIndex('eventId', 'eventId', { unique: false });
         }
+        if (!database.objectStoreNames.contains('noise-events')) {
+          database.createObjectStore('noise-events', { keyPath: 'id' });
+        }
       };
-      request.onsuccess = () => resolve(request.result);
+      request.onsuccess = () => {
+        this.database = request.result;
+        request.result.onversionchange = () => request.result.close();
+        resolve(request.result);
+      };
       request.onerror = () => reject(request.error ?? new Error('Impossibile aprire IndexedDB.'));
       request.onblocked = () => reject(new Error('Aggiornamento IndexedDB bloccato da un’altra scheda.'));
     });

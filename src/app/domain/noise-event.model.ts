@@ -6,11 +6,34 @@ export const NOISE_EVENT_TYPES = [
   'MUSIC',
   'VOICES',
   'SYSTEM',
+  'APPLIANCE',
+  'TRAFFIC',
+  'UNKNOWN',
+  'OTHER',
 ] as const;
 
 export type NoiseEventType = (typeof NOISE_EVENT_TYPES)[number];
-export type EventStatus = 'draft' | 'recorded' | 'reviewed';
-export type ContinuityType = 'continuous' | 'intermittent' | 'single';
+export const EVENT_STATUSES = ['draft', 'complete', 'to-review', 'exported', 'archived'] as const;
+export type EventStatus = (typeof EVENT_STATUSES)[number];
+export const CONTINUITY_TYPES = [
+  'continuous',
+  'intermittent',
+  'impulsive',
+  'periodic',
+  'variable',
+  'unknown',
+] as const;
+export type ContinuityType = (typeof CONTINUITY_TYPES)[number];
+export const PERCEIVED_EFFECTS = [
+  'awakening',
+  'difficulty-falling-asleep',
+  'activity-interruption',
+  'vibration-perceived',
+  'concentration-difficulty',
+  'simple-observation',
+  'other',
+] as const;
+export type PerceivedEffect = (typeof PERCEIVED_EFFECTS)[number];
 
 export interface FrequencyBand {
   label: string;
@@ -104,7 +127,7 @@ export interface NoiseEvent {
   eventType: NoiseEventType;
   continuityType: ContinuityType;
   perceivedIntensity: number;
-  perceivedEffects: string[];
+  perceivedEffects: PerceivedEffect[];
   suspectedSource: string;
   description: string;
   notes: string;
@@ -126,7 +149,10 @@ export interface NoiseEventDraft {
   description: string;
   notes: string;
   tags: string;
-  perceivedEffects: string;
+  perceivedEffects: PerceivedEffect;
+  startedAt: string;
+  durationMinutes: number | null;
+  status: EventStatus;
   windowsState: string;
   doorsState: string;
   microphonePosition: string;

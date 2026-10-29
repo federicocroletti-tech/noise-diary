@@ -29,7 +29,10 @@
       </div>
     </section>
 
-    <section class="panel form-panel" *ngIf="showForm()">
+    <section class="panel storage-message" *ngIf="storageError()" role="alert">{{ storageError() }}</section>
+    <section class="panel storage-message" *ngIf="loadingEvents()" role="status">Caricamento del diario locale…</section>
+
+    <section class="panel form-panel" *ngIf="showForm() && !loadingEvents()">
       <div class="section-heading">
         <h2>Nuovo episodio</h2>
         <span>Riservato al dispositivo dell'utente</span>
@@ -43,6 +46,17 @@
 
         <div class="two-columns">
           <label>
+            <span>Data e ora di inizio</span>
+            <input type="datetime-local" required [value]="draft().startedAt" (input)="onFieldChange('startedAt', $any($event.target).value)" />
+          </label>
+          <label>
+            <span>Durata (minuti, facoltativa)</span>
+            <input type="number" min="1" step="1" [value]="draft().durationMinutes ?? ''" (input)="onFieldChange('durationMinutes', $any($event.target).value ? +$any($event.target).value : null)" />
+          </label>
+        </div>
+
+        <div class="two-columns">
+          <label>
             <span>Stanza</span>
             <input type="text" [value]="draft().room" (input)="onFieldChange('room', $any($event.target).value)" />
           </label>
@@ -50,24 +64,37 @@
           <label>
             <span>Tipo evento</span>
             <select [value]="draft().eventType" (change)="onFieldChange('eventType', $any($event.target).value)">
-              <option *ngFor="let option of eventTypeOptions" [value]="option">{{ option }}</option>
+              <option *ngFor="let option of eventTypeOptions" [value]="option" [selected]="option === draft().eventType">{{ labelFor(option) }}</option>
             </select>
           </label>
         </div>
 
         <div class="two-columns">
           <label>
-            <span>Intensità percepita (1–10)</span>
-            <input type="range" min="1" max="10" [value]="draft().perceivedIntensity" (input)="onFieldChange('perceivedIntensity', +$any($event.target).value)" />
-            <small>{{ draft().perceivedIntensity }}/10</small>
+            <span>Intensità percepita (1–5, soggettiva)</span>
+            <input type="range" min="1" max="5" step="1" [value]="draft().perceivedIntensity" (input)="onFieldChange('perceivedIntensity', +$any($event.target).value)" />
+            <small>{{ draft().perceivedIntensity }}/5 · valutazione personale</small>
           </label>
 
           <label>
-            <span>Continuità</span>
+            <span>Andamento</span>
             <select [value]="draft().continuityType" (change)="onFieldChange('continuityType', $any($event.target).value)">
-              <option value="continuous">continua</option>
-              <option value="intermittent">intermittente</option>
-              <option value="single">singola</option>
+              <option *ngFor="let option of continuityOptions" [value]="option" [selected]="option === draft().continuityType">{{ labelFor(option) }}</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="two-columns">
+          <label>
+            <span>Effetto percepito</span>
+            <select [value]="draft().perceivedEffects" (change)="onFieldChange('perceivedEffects', $any($event.target).value)">
+              <option *ngFor="let option of perceivedEffectOptions" [value]="option" [selected]="option === draft().perceivedEffects">{{ labelFor(option) }}</option>
+            </select>
+          </label>
+          <label>
+            <span>Stato</span>
+            <select [value]="draft().status" (change)="onFieldChange('status', $any($event.target).value)">
+              <option *ngFor="let option of statusOptions" [value]="option" [selected]="option === draft().status">{{ labelFor(option) }}</option>
             </select>
           </label>
         </div>
@@ -87,17 +114,10 @@
           <textarea rows="2" [value]="draft().notes" (input)="onFieldChange('notes', $any($event.target).value)" placeholder="Eventi e osservazioni rilevanti."></textarea>
         </label>
 
-        <div class="two-columns">
-          <label>
-            <span>Tags</span>
-            <input type="text" [value]="draft().tags" (input)="onFieldChange('tags', $any($event.target).value)" />
-          </label>
-
-          <label>
-            <span>Effetti percepiti</span>
-            <input type="text" [value]="draft().perceivedEffects" (input)="onFieldChange('perceivedEffects', $any($event.target).value)" />
-          </label>
-        </div>
+        <label>
+          <span>Tag (separati da virgola)</span>
+          <input type="text" [value]="draft().tags" (input)="onFieldChange('tags', $any($event.target).value)" />
+        </label>
 
         <div class="two-columns">
           <label>
@@ -141,25 +161,25 @@
             <span>{{ event.eventType }}</span>
           </div>
           <small>{{ event.room }} · {{ event.startedAt | date: 'dd MMM yyyy, HH:mm' }}</small>
-          <p>{{ event.description }}</p>
+          <p>{{ event.description || 'Nessuna descrizione inserita.' }}</p>
         </li>
       </ul>
 
       <ng-template #emptyState>
-        <p class="empty-state">Nessun evento trovato. Aggiungi un record per iniziare il diario.</p>
+        <p class="empty-state">Nessun episodio nel diario. Crea una bozza per iniziare: gli episodi vengono salvati solo su questo dispositivo.</p>
       </ng-template>
     </section>
 
     <aside class="panel detail-panel" *ngIf="selectedEvent() as event">
       <div class="section-heading compact">
         <h2>Dettaglio</h2>
-        <span class="status-badge">{{ event.status }}</span>
+        <span class="status-badge">{{ labelFor(event.status) }}</span>
       </div>
 
       <div class="detail-summary">
         <div class="tag-row">
-          <span class="tag">{{ event.eventType }}</span>
-          <span class="tag secondary">{{ event.continuityType }}</span>
+          <span class="tag">{{ labelFor(event.eventType) }}</span>
+          <span class="tag secondary">{{ labelFor(event.continuityType) }}</span>
         </div>
         <h3>{{ event.locationLabel }}</h3>
         <p>{{ event.description }}</p>
@@ -264,7 +284,7 @@
       </section>
 
       <div class="meta-grid">
-        <div><span>Intensità</span><strong>{{ event.perceivedIntensity }}/10</strong></div>
+        <div><span>Intensità percepita</span><strong>{{ event.perceivedIntensity }}/5 · soggettiva</strong></div>
         <div><span>Sorgente</span><strong>{{ event.suspectedSource }}</strong></div>
         <div><span>Finestra</span><strong>{{ event.windowsState ?? 'non indicata' }}</strong></div>
         <div><span>Porta</span><strong>{{ event.doorsState ?? 'non indicata' }}</strong></div>
@@ -272,17 +292,13 @@
 
       <div class="chart-panel">
         <h4>Analisi frequenze (informativa)</h4>
-        <div class="frequency-chart" aria-label="Analisi frequenze informativa">
-          <div class="bar" *ngFor="let band of analysisBands()" [style.height.%]="band.amplitude">
-            <span>{{ band.label }}</span>
-          </div>
-        </div>
+        <p class="empty-state">Analisi non disponibile: nessun dato è stato calcolato per questo episodio.</p>
       </div>
 
       <div class="notes-block">
         <h4>Note</h4>
         <ul>
-          <li *ngFor="let effect of event.perceivedEffects">{{ effect }}</li>
+          <li *ngFor="let effect of event.perceivedEffects">{{ labelFor(effect) }}</li>
         </ul>
       </div>
     </aside>

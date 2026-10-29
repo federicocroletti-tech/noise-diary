@@ -7,26 +7,42 @@ import {
   formatRecordingError,
   MAX_RECORDING_DURATION_SECONDS,
 } from './audio/audio-recording.service';
-import { AudioAnalysisService } from './services/audio-analysis.service';
 import { NoiseStorageService } from './services/noise-storage.service';
-import { NoiseEvent, NoiseEventDraft, NoiseEventType } from './domain/noise-event.model';
+import {
+  CONTINUITY_TYPES,
+  EVENT_STATUSES,
+  NoiseEvent,
+  NoiseEventDraft,
+  NoiseEventType,
+  PerceivedEffect,
+  PERCEIVED_EFFECTS,
+} from './domain/noise-event.model';
 
 type SortMode = 'recent' | 'intensity' | 'room';
 
+function currentLocalDateTime(): string {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+
 const EMPTY_DRAFT: NoiseEventDraft = {
   locationLabel: '',
-  room: 'Soggiorno',
+  room: '',
   eventType: 'HUM',
-  continuityType: 'continuous',
-  perceivedIntensity: 5,
-  suspectedSource: 'ventilazione (ipotesi)',
+  continuityType: 'unknown',
+  perceivedIntensity: 3,
+  suspectedSource: '',
   description: '',
   notes: '',
-  tags: 'serale, casa',
-  perceivedEffects: 'ronzio, vibrazione leggera',
-  windowsState: 'chiusi',
-  doorsState: 'chiusa',
-  microphonePosition: 'davanti a finestra',
+  tags: '',
+  perceivedEffects: 'simple-observation',
+  windowsState: '',
+  doorsState: '',
+  microphonePosition: '',
+  startedAt: currentLocalDateTime(),
+  durationMinutes: null,
+  status: 'draft',
 };
 
 @Component({
@@ -39,6 +55,8 @@ const EMPTY_DRAFT: NoiseEventDraft = {
 export class App implements OnDestroy {
   protected readonly title = signal('Diario Rumore');
   protected readonly showForm = signal(true);
+  protected readonly loadingEvents = signal(true);
+  protected readonly storageError = signal('');
   protected readonly search = signal('');
   protected readonly sortMode = signal<SortMode>('recent');
   protected readonly draft = signal<NoiseEventDraft>({ ...EMPTY_DRAFT });
@@ -94,11 +112,6 @@ export class App implements OnDestroy {
     return this.events().find((event) => event.id === selectedId) ?? this.filteredEvents()[0] ?? null;
   });
 
-  protected readonly analysisBands = computed(() => {
-    const event = this.selectedEvent();
-    return this.audioAnalysisService.buildBands(event);
-  });
-
   protected readonly eventTypeOptions: readonly NoiseEventType[] = [
     'HUM',
     'VIBRATION',
@@ -107,15 +120,52 @@ export class App implements OnDestroy {
     'MUSIC',
     'VOICES',
     'SYSTEM',
+    'APPLIANCE',
+    'TRAFFIC',
+    'UNKNOWN',
+    'OTHER',
   ];
+  protected readonly continuityOptions = CONTINUITY_TYPES;
+  protected readonly statusOptions = EVENT_STATUSES;
+  protected readonly perceivedEffectOptions: readonly PerceivedEffect[] = PERCEIVED_EFFECTS;
+  protected readonly choiceLabels: Record<string, string> = {
+    HUM: 'Ronzio',
+    VIBRATION: 'Vibrazione',
+    IMPACT: 'Impatto',
+    DRAGGING: 'Trascinamento',
+    MUSIC: 'Musica',
+    VOICES: 'Voci',
+    SYSTEM: 'Impianto',
+    APPLIANCE: 'Elettrodomestico',
+    TRAFFIC: 'Traffico',
+    UNKNOWN: 'Non identificato',
+    OTHER: 'Altro',
+    continuous: 'Continuo',
+    intermittent: 'Intermittente',
+    impulsive: 'Impulsivo',
+    periodic: 'Periodico',
+    variable: 'Variabile',
+    unknown: 'Non specificato',
+    draft: 'Bozza',
+    complete: 'Completo',
+    'to-review': 'Da verificare',
+    exported: 'Esportato',
+    archived: 'Archiviato',
+    awakening: 'Risveglio',
+    'difficulty-falling-asleep': 'Difficoltà ad addormentarsi',
+    'activity-interruption': 'Interruzione attività',
+    'vibration-perceived': 'Vibrazione percepita',
+    'concentration-difficulty': 'Difficoltà di concentrazione',
+    'simple-observation': 'Sola osservazione',
+    other: 'Altro',
+  };
 
   constructor(
     private readonly storageService: NoiseStorageService,
-    private readonly audioAnalysisService: AudioAnalysisService,
     private readonly audioRecordingService: AudioRecordingService,
     private readonly audioClipRepository: AudioClipRepository,
   ) {
-    this.initialize();
+    void this.initialize();
   }
 
   ngOnDestroy(): void {
@@ -127,50 +177,74 @@ export class App implements OnDestroy {
     this.showForm.update((value) => !value);
   }
 
+  protected labelFor(value: string): string {
+    return this.choiceLabels[value] ?? value;
+  }
+
   protected onFieldChange<K extends keyof NoiseEventDraft>(field: K, value: NoiseEventDraft[K]): void {
     this.draft.update((current) => ({ ...current, [field]: value }));
   }
 
-  protected submitDraft(): void {
+  protected async submitDraft(): Promise<void> {
     const draft = this.draft();
+    const startedAtDate = new Date(draft.startedAt);
+    if (!Number.isFinite(startedAtDate.getTime())) {
+      this.storageError.set('Inserisci una data e un’ora di inizio valide.');
+      return;
+    }
+
+    const startedAt = startedAtDate.toISOString();
     const timestamp = new Date().toISOString();
+    const durationSeconds =
+      draft.durationMinutes !== null && draft.durationMinutes > 0
+        ? Math.round(draft.durationMinutes * 60)
+        : undefined;
+    const endedAt = durationSeconds
+      ? new Date(startedAtDate.getTime() + durationSeconds * 1000).toISOString()
+      : undefined;
     const event: NoiseEvent = {
       id: `evt-${crypto.randomUUID()}`,
-      startedAt: timestamp,
-      endedAt: timestamp,
-      duration: 120,
+      startedAt,
+      endedAt,
+      duration: durationSeconds,
       createdAt: timestamp,
       updatedAt: timestamp,
-      locationLabel: draft.locationLabel || 'Luogo non specificato',
-      room: draft.room || 'Generico',
-      microphonePosition: draft.microphonePosition,
-      windowsState: draft.windowsState,
-      doorsState: draft.doorsState,
+      locationLabel: draft.locationLabel.trim(),
+      room: draft.room.trim(),
+      microphonePosition: draft.microphonePosition.trim() || undefined,
+      windowsState: draft.windowsState.trim() || undefined,
+      doorsState: draft.doorsState.trim() || undefined,
       eventType: draft.eventType,
       continuityType: draft.continuityType,
       perceivedIntensity: draft.perceivedIntensity,
-      perceivedEffects: draft.perceivedEffects
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean),
-      suspectedSource: draft.suspectedSource,
-      description: draft.description || 'Evento registrato in modalità demo.',
-      notes: draft.notes || 'Nessuna nota aggiuntiva.',
-      status: 'draft',
+      perceivedEffects: [draft.perceivedEffects],
+      suspectedSource: draft.suspectedSource.trim()
+        ? `${draft.suspectedSource.trim()} (ipotesi)`
+        : 'Non specificata (ipotesi)',
+      description: draft.description.trim(),
+      notes: draft.notes.trim(),
+      status: draft.status,
       tags: draft.tags
         .split(',')
         .map((tag) => tag.trim())
         .filter(Boolean),
       attachmentIds: [],
-      backgroundRecordingId: undefined,
     };
 
     const events = [event, ...this.events()];
-    this.events.set(events);
-    this.selectedEventId.set(event.id);
-    this.storageService.saveEvents(events);
-    this.draft.set({ ...EMPTY_DRAFT });
-    this.showForm.set(false);
+    try {
+      await this.storageService.saveEvents(events);
+      this.events.set(events);
+      this.selectedEventId.set(event.id);
+      this.draft.set({ ...EMPTY_DRAFT, startedAt: currentLocalDateTime() });
+      this.showForm.set(false);
+      this.storageError.set('');
+      await this.loadAudioForEvent(event.id);
+    } catch (error) {
+      this.storageError.set(
+        error instanceof Error ? error.message : 'Impossibile salvare l’episodio nel dispositivo.',
+      );
+    }
   }
 
   protected selectEvent(id: string): void {
@@ -238,7 +312,7 @@ export class App implements OnDestroy {
   protected async stopAudioRecording(): Promise<void> {
     try {
       const clip = await this.audioRecordingService.stop();
-      this.addClipToEvent(clip);
+      await this.addClipToEvent(clip);
       await this.loadAudioForEvent(clip.eventId);
       this.audioStatus.set('Registrazione salvata solo su questo dispositivo.');
     } catch (error) {
@@ -269,8 +343,8 @@ export class App implements OnDestroy {
         const updatedEvents = this.events().map((item) =>
           item.id === updatedEvent.id ? updatedEvent : item,
         );
+        await this.storageService.saveEvents(updatedEvents);
         this.events.set(updatedEvents);
-        this.storageService.saveEvents(updatedEvents);
       }
       this.revokeAudioUrl(clip.id);
       this.audioClips.update((clips) => clips.filter((item) => item.id !== clip.id));
@@ -318,14 +392,21 @@ export class App implements OnDestroy {
     URL.revokeObjectURL(url);
   }
 
-  private initialize(): void {
-    const storedEvents = this.storageService.loadEvents();
-    const initialEvents = storedEvents.length > 0 ? storedEvents : this.audioAnalysisService.seedDemoEvents();
-    this.events.set(initialEvents);
-    this.selectedEventId.set(initialEvents[0]?.id ?? null);
-    this.storageService.saveEvents(initialEvents);
-    if (initialEvents[0]) {
-      void this.loadAudioForEvent(initialEvents[0].id);
+  private async initialize(): Promise<void> {
+    try {
+      const initialEvents = await this.storageService.loadEvents();
+      this.events.set(initialEvents);
+      this.selectedEventId.set(initialEvents[0]?.id ?? null);
+      this.storageError.set('');
+      if (initialEvents[0]) {
+        await this.loadAudioForEvent(initialEvents[0].id);
+      }
+    } catch (error) {
+      this.storageError.set(
+        error instanceof Error ? error.message : 'Impossibile caricare gli episodi salvati sul dispositivo.',
+      );
+    } finally {
+      this.loadingEvents.set(false);
     }
   }
 
@@ -348,7 +429,7 @@ export class App implements OnDestroy {
     }
   }
 
-  private addClipToEvent(clip: AudioClip): void {
+  private async addClipToEvent(clip: AudioClip): Promise<void> {
     const event = this.events().find((item) => item.id === clip.eventId);
     if (!event) {
       return;
@@ -361,8 +442,8 @@ export class App implements OnDestroy {
       updatedAt: new Date().toISOString(),
     };
     const updatedEvents = this.events().map((item) => (item.id === event.id ? updatedEvent : item));
+    await this.storageService.saveEvents(updatedEvents);
     this.events.set(updatedEvents);
-    this.storageService.saveEvents(updatedEvents);
   }
 
   private revokeAudioUrl(clipId: string): void {

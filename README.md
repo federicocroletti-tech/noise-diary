@@ -15,7 +15,9 @@ npm install
 npm start
 ```
 
-La app è pensata per essere installata come PWA e per salvare i dati localmente nel browser senza backend nell'MVP.
+La app è pensata per essere installata come PWA e per salvare episodi e allegati nel solo IndexedDB del browser, senza backend nell'MVP. La prima apertura è vuota: i dati dimostrativi sono usati solo nei test. Gli episodi migrati dalla precedente versione localStorage vengono convertiti al modello corrente; i record demo incorporati nella vecchia versione vengono rimossi durante la migrazione.
+
+L'intensità è una valutazione soggettiva da 1 a 5. Le sorgenti indicate dall'utente restano ipotesi e non sono accertamenti. Il form consente di salvare bozze incomplete.
 
 ## Registrazioni audio
 
@@ -35,3 +37,12 @@ Le registrazioni sono file audio digitali non calibrati. Non costituiscono misur
 npm test
 npm run build
 ```
+
+## Funzionalità disponibili e limiti
+
+- Diario cronologico locale, ricerca, ordinamento e creazione di bozze.
+- Intensità percepita 1–5, tipologie, andamento, stato e contesto dell'episodio.
+- Registrazione audio locale per evento o rumore di fondo.
+- Non sono ancora implementati modifica, archiviazione/eliminazione degli episodi, allegati immagine, confronto evento/fondo o analisi audio reale.
+- La visualizzazione delle frequenze rimane disattivata finché non sarà calcolata da un'analisi reale.
+- L'esportazione JSON attuale contiene i metadati degli episodi, non i file audio.

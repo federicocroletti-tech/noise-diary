@@ -116,6 +116,12 @@ button.secondary {
   box-shadow: var(--shadow);
 }
 
+.storage-message {
+  grid-column: 1 / -1;
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
 .overview {
   grid-column: 1 / -1;
   display: grid;
