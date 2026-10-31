@@ -1,5 +1,6 @@
 import { AudioClipRepository } from './audio-clip.repository';
 import { AudioRecordingService } from './audio-recording.service';
+import { LocalVaultService } from '../services/local-vault.service';
 import {
   calculateSha256,
   chooseSupportedAudioMimeType,
@@ -83,7 +84,7 @@ describe('audio recording helpers', () => {
 
     const stopTrack = vi.fn();
     const saveClip = vi.fn().mockResolvedValue(undefined);
-    const repository = new AudioClipRepository();
+    const repository = new AudioClipRepository(new LocalVaultService());
     vi.spyOn(repository, 'save').mockImplementation(saveClip);
     vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
     vi.stubGlobal('navigator', {
@@ -128,7 +129,7 @@ describe('audio recording helpers', () => {
       isTypeSupported: vi.fn(() => true),
     });
 
-    const service = new AudioRecordingService(new AudioClipRepository());
+    const service = new AudioRecordingService(new AudioClipRepository(new LocalVaultService()));
 
     await expect(service.start('event-test-1', 'event')).rejects.toMatchObject({
       name: 'NotAllowedError',

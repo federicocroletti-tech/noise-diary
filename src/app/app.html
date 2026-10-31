@@ -5,15 +5,92 @@
       <h1>{{ title() }}</h1>
     </div>
 
-    <div class="header-actions">
+    <div class="header-actions" *ngIf="authMode() === 'unlocked'">
       <button type="button" class="secondary" (click)="toggleForm()">
         {{ showForm() ? 'Nascondi modulo' : 'Nuovo episodio' }}
       </button>
+      <button type="button" class="secondary" (click)="importInput.click()">Importa storico JSON</button>
+      <input
+        #importInput
+        class="visually-hidden"
+        type="file"
+        accept=".json,application/json"
+        (change)="importDiary($event)"
+      />
       <button type="button" class="primary" (click)="downloadExport()">Esporta JSON</button>
+      <button type="button" class="secondary" (click)="lockDiary()">Blocca</button>
     </div>
   </header>
 
-  <main class="layout">
+  <section class="panel auth-panel" *ngIf="authMode() === 'loading'" role="status">
+    Verifica della protezione locale…
+  </section>
+
+  <section class="panel auth-panel" *ngIf="authMode() !== 'loading' && authMode() !== 'unlocked'">
+    <ng-container *ngIf="authMode() === 'setup'; else existingVault">
+      <h2>Proteggi il diario locale</h2>
+      <p>
+        I dati e le registrazioni saranno cifrati su questo dispositivo. La password non viene inviata
+        a un server e non può essere recuperata.
+      </p>
+      <form class="auth-form" (submit)="$event.preventDefault(); submitVaultAccess()">
+        <label>
+          <span>Crea una password (almeno 12 caratteri)</span>
+          <input
+            type="password"
+            autocomplete="new-password"
+            minlength="12"
+            required
+            [value]="passwordInput()"
+            (input)="passwordInput.set($any($event.target).value)"
+          />
+        </label>
+        <label>
+          <span>Conferma password</span>
+          <input
+            type="password"
+            autocomplete="new-password"
+            required
+            [value]="passwordConfirmation()"
+            (input)="passwordConfirmation.set($any($event.target).value)"
+          />
+        </label>
+        <button type="submit" class="primary" [disabled]="authBusy()">Crea password e sblocca</button>
+      </form>
+    </ng-container>
+
+    <ng-template #existingVault>
+      <ng-container *ngIf="authMode() === 'locked'; else unavailableVault">
+        <h2>Sblocca diario</h2>
+        <form class="auth-form" (submit)="$event.preventDefault(); submitVaultAccess()">
+          <label>
+            <span>Password locale</span>
+            <input
+              type="password"
+              autocomplete="current-password"
+              required
+              [value]="passwordInput()"
+              (input)="passwordInput.set($any($event.target).value)"
+            />
+          </label>
+          <button type="submit" class="primary" [disabled]="authBusy()">Sblocca diario</button>
+        </form>
+      </ng-container>
+    </ng-template>
+
+    <ng-template #unavailableVault>
+      <h2>Diario non disponibile</h2>
+      <p>La configurazione di cifratura non è leggibile. Non cancellare i dati del browser.</p>
+    </ng-template>
+
+    <p *ngIf="authError()" class="storage-message" role="alert">{{ authError() }}</p>
+    <p *ngIf="authMode() === 'setup'" class="privacy-note">
+      Conserva la password e crea regolarmente un’esportazione: senza password non è possibile
+      recuperare i dati cifrati.
+    </p>
+  </section>
+
+  <main class="layout" *ngIf="authMode() === 'unlocked'">
     <section class="overview panel">
       <div class="stat-card">
         <span class="label">Eventi</span>
@@ -21,7 +98,7 @@
       </div>
       <div class="stat-card">
         <span class="label">Media percepita</span>
-        <strong>{{ events().length ? (events().reduce((sum, event) => sum + event.perceivedIntensity, 0) / events().length).toFixed(1) : '0.0' }}</strong>
+        <strong>{{ averageIntensity() }}</strong>
       </div>
       <div class="stat-card highlight">
         <span class="label">Stato</span>
@@ -30,6 +107,7 @@
     </section>
 
     <section class="panel storage-message" *ngIf="storageError()" role="alert">{{ storageError() }}</section>
+    <section class="panel import-message" *ngIf="importStatus()" role="status">{{ importStatus() }}</section>
     <section class="panel storage-message" *ngIf="loadingEvents()" role="status">Caricamento del diario locale…</section>
 
     <section class="panel form-panel" *ngIf="showForm() && !loadingEvents()">
@@ -166,7 +244,7 @@
       </ul>
 
       <ng-template #emptyState>
-        <p class="empty-state">Nessun episodio nel diario. Crea una bozza per iniziare: gli episodi vengono salvati solo su questo dispositivo.</p>
+        <p class="empty-state">Nessun episodio nel diario. Crea un episodio o importa uno storico JSON; i dati restano cifrati su questo dispositivo.</p>
       </ng-template>
     </section>
 
@@ -284,7 +362,7 @@
       </section>
 
       <div class="meta-grid">
-        <div><span>Intensità percepita</span><strong>{{ event.perceivedIntensity }}/5 · soggettiva</strong></div>
+        <div><span>Intensità percepita</span><strong>{{ event.perceivedIntensity === null ? 'Non indicata' : event.perceivedIntensity + '/5 · soggettiva' }}</strong></div>
         <div><span>Sorgente</span><strong>{{ event.suspectedSource }}</strong></div>
         <div><span>Finestra</span><strong>{{ event.windowsState ?? 'non indicata' }}</strong></div>
         <div><span>Porta</span><strong>{{ event.doorsState ?? 'non indicata' }}</strong></div>

@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import {
   CONTINUITY_TYPES,
   EVENT_STATUSES,
+  isNoiseEvent,
   NOISE_EVENT_TYPES,
   NoiseEvent,
   PerceivedEffect,
@@ -25,29 +26,61 @@ export class NoiseStorageService {
 
   async loadEvents(): Promise<NoiseEvent[]> {
     const storedEvents = await this.repository.getAll();
-    if (storedEvents.length > 0) {
-      storedEvents.forEach((event) => this.validateEvent(event));
-      return storedEvents;
-    }
-
     const legacyEvents = this.readLegacyEvents();
     if (legacyEvents.length === 0) {
-      return [];
+      storedEvents.forEach((event) => this.validateEvent(event));
+      return storedEvents;
     }
 
     const migratedEvents = legacyEvents
       .filter((event) => !this.isDemoEvent(event))
       .map((event, index) => this.normalizeEvent(event, index));
-    await this.repository.saveAll(migratedEvents);
+    const mergedById = new Map(storedEvents.map((event) => [event.id, event]));
+    for (const event of migratedEvents) {
+      if (!mergedById.has(event.id)) {
+        mergedById.set(event.id, event);
+      }
+    }
+    const mergedEvents = [...mergedById.values()];
+    mergedEvents.forEach((event) => this.validateEvent(event));
+    await this.repository.saveAll(mergedEvents);
     localStorage.removeItem(LEGACY_STORAGE_KEY);
-    return migratedEvents;
+    return mergedEvents;
   }
 
   async saveEvents(events: NoiseEvent[]): Promise<void> {
     for (const event of events) {
       this.validateEvent(event);
     }
+    if (new Set(events.map((event) => event.id)).size !== events.length) {
+      throw new Error('Il diario contiene ID episodio duplicati; i dati non sono stati modificati.');
+    }
     await this.repository.saveAll(events);
+  }
+
+  parseImport(value: unknown): NoiseEvent[] {
+    const candidate =
+      Array.isArray(value) || !value || typeof value !== 'object'
+        ? value
+        : 'events' in value
+          ? value.events
+          : undefined;
+    if (!Array.isArray(candidate) || candidate.length === 0) {
+      throw new Error('Il file deve contenere un elenco non vuoto di episodi.');
+    }
+
+    const importedEvents = candidate.map((event, index) => {
+      if (!isNoiseEvent(event)) {
+        throw new Error(`L’episodio ${index + 1} non rispetta il formato previsto.`);
+      }
+      this.validateEvent(event);
+      return event;
+    });
+    const ids = importedEvents.map((event) => event.id);
+    if (new Set(ids).size !== ids.length) {
+      throw new Error('Il file contiene ID duplicati; nessun dato è stato importato.');
+    }
+    return importedEvents;
   }
 
   private readLegacyEvents(): unknown[] {
@@ -193,8 +226,13 @@ export class NoiseStorageService {
     if (!event.id || !Number.isFinite(Date.parse(event.startedAt))) {
       throw new Error('Ogni episodio deve avere un ID e una data di inizio valida.');
     }
-    if (!Number.isInteger(event.perceivedIntensity) || event.perceivedIntensity < 1 || event.perceivedIntensity > 5) {
-      throw new Error('L’intensità percepita deve essere un numero intero da 1 a 5.');
+    if (
+      event.perceivedIntensity !== null &&
+      (!Number.isInteger(event.perceivedIntensity) ||
+        event.perceivedIntensity < 1 ||
+        event.perceivedIntensity > 5)
+    ) {
+      throw new Error('L’intensità percepita deve essere non indicata oppure un numero intero da 1 a 5.');
     }
     if (!NOISE_EVENT_TYPES.includes(event.eventType)) {
       throw new Error('La tipologia dell’episodio non è valida.');

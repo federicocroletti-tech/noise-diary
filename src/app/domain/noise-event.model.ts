@@ -126,7 +126,7 @@ export interface NoiseEvent {
   doorsState?: string;
   eventType: NoiseEventType;
   continuityType: ContinuityType;
-  perceivedIntensity: number;
+  perceivedIntensity: number | null;
   perceivedEffects: PerceivedEffect[];
   suspectedSource: string;
   description: string;
@@ -156,4 +156,62 @@ export interface NoiseEventDraft {
   windowsState: string;
   doorsState: string;
   microphonePosition: string;
+}
+
+type NoiseEventCandidate = { [K in keyof NoiseEvent]?: unknown };
+
+export function isNoiseEvent(value: unknown): value is NoiseEvent {
+  if (value === null || typeof value !== 'object') {
+    return false;
+  }
+  const event = value as NoiseEventCandidate;
+  return (
+    typeof event.id === 'string' &&
+    event.id.length > 0 &&
+    typeof event.startedAt === 'string' &&
+    Number.isFinite(Date.parse(event.startedAt)) &&
+    (event.endedAt === undefined ||
+      (typeof event.endedAt === 'string' && Number.isFinite(Date.parse(event.endedAt)))) &&
+    typeof event.createdAt === 'string' &&
+    Number.isFinite(Date.parse(event.createdAt)) &&
+    typeof event.updatedAt === 'string' &&
+    Number.isFinite(Date.parse(event.updatedAt)) &&
+    typeof event.locationLabel === 'string' &&
+    typeof event.room === 'string' &&
+    (event.microphonePosition === undefined || typeof event.microphonePosition === 'string') &&
+    (event.windowsState === undefined || typeof event.windowsState === 'string') &&
+    (event.doorsState === undefined || typeof event.doorsState === 'string') &&
+    typeof event.eventType === 'string' &&
+    NOISE_EVENT_TYPES.includes(event.eventType as NoiseEventType) &&
+    typeof event.continuityType === 'string' &&
+    CONTINUITY_TYPES.includes(event.continuityType as ContinuityType) &&
+    (event.perceivedIntensity === null ||
+      (typeof event.perceivedIntensity === 'number' &&
+        Number.isInteger(event.perceivedIntensity) &&
+        event.perceivedIntensity >= 1 &&
+        event.perceivedIntensity <= 5)) &&
+    Array.isArray(event.perceivedEffects) &&
+    event.perceivedEffects.every(
+      (effect) => typeof effect === 'string' && PERCEIVED_EFFECTS.includes(effect as PerceivedEffect),
+    ) &&
+    typeof event.suspectedSource === 'string' &&
+    /ipotesi/i.test(event.suspectedSource) &&
+    typeof event.description === 'string' &&
+    typeof event.notes === 'string' &&
+    (event.duration === undefined ||
+      (typeof event.duration === 'number' && Number.isFinite(event.duration) && event.duration > 0)) &&
+    (event.witnessesCount === undefined ||
+      (typeof event.witnessesCount === 'number' &&
+        Number.isInteger(event.witnessesCount) &&
+        event.witnessesCount >= 0)) &&
+    typeof event.status === 'string' &&
+    EVENT_STATUSES.includes(event.status as EventStatus) &&
+    Array.isArray(event.tags) &&
+    event.tags.every((tag) => typeof tag === 'string') &&
+    Array.isArray(event.attachmentIds) &&
+    event.attachmentIds.every((id) => typeof id === 'string') &&
+    (event.backgroundRecordingId === undefined || typeof event.backgroundRecordingId === 'string') &&
+    (event.deletedAt === undefined ||
+      (typeof event.deletedAt === 'string' && Number.isFinite(Date.parse(event.deletedAt))))
+  );
 }

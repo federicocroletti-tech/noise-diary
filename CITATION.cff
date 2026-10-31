@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "Se questo progetto è utile, cita il repository e indica la versione consultata."
+title: "Diario Rumore"
+type: software
+authors:
+  - family-names: Croletti
+    given-names: Federico
+repository-code: "https://github.com/federicocroletti-tech/noise-diary"
+abstract: "Applicazione local-first e guide organizzative per documentare episodi di rumore."

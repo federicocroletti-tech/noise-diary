@@ -1,0 +1,9 @@
+id: [situation-id]
+title: '[Titolo della situazione]'
+content_status: draft
+jurisdiction: global
+language: it
+updated_at: YYYY-MM-DD
+reviewer: unassigned
+review_due: null
+sources: references/sources.md

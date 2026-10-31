@@ -122,6 +122,55 @@ button.secondary {
   border-color: rgba(248, 113, 113, 0.4);
 }
 
+.auth-panel {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.auth-panel h2 {
+  margin-top: 0;
+}
+
+.auth-panel p,
+.privacy-note {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.auth-form button {
+  align-self: flex-start;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.import-message {
+  grid-column: 1 / -1;
+  color: #bbf7d0;
+  border-color: rgba(74, 222, 128, 0.4);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .overview {
   grid-column: 1 / -1;
   display: grid;

@@ -6,7 +6,9 @@
     "start": "ng serve --host 0.0.0.0 --port 4200",
     "build": "ng build --configuration production --base-href ./",
     "watch": "ng build --watch --configuration development --base-href ./",
-    "test": "ng test --watch=false"
+    "test": "ng test --watch=false",
+    "lint": "prettier --check \"**/*.md\" \"**/*.yml\" \"tools/**/*.mjs\"",
+    "content:check": "node tools/content-check.mjs"
   },
   "private": true,
   "packageManager": "npm@10.9.8",

@@ -7,6 +7,7 @@ import {
   formatRecordingError,
   MAX_RECORDING_DURATION_SECONDS,
 } from './audio/audio-recording.service';
+import { LocalVaultService } from './services/local-vault.service';
 import { NoiseStorageService } from './services/noise-storage.service';
 import {
   CONTINUITY_TYPES,
@@ -54,6 +55,13 @@ const EMPTY_DRAFT: NoiseEventDraft = {
 })
 export class App implements OnDestroy {
   protected readonly title = signal('Diario Rumore');
+  protected readonly authMode = signal<'loading' | 'setup' | 'locked' | 'unavailable' | 'unlocked'>(
+    'loading',
+  );
+  protected readonly passwordInput = signal('');
+  protected readonly passwordConfirmation = signal('');
+  protected readonly authError = signal('');
+  protected readonly authBusy = signal(false);
   protected readonly showForm = signal(true);
   protected readonly loadingEvents = signal(true);
   protected readonly storageError = signal('');
@@ -66,12 +74,22 @@ export class App implements OnDestroy {
   protected readonly audioUrls = signal<Record<string, string>>({});
   protected readonly audioError = signal('');
   protected readonly audioStatus = signal('');
+  protected readonly importStatus = signal('');
   protected readonly recordingKind = signal<AudioClipKind>('event');
   protected readonly recordingActive = signal(false);
   protected readonly recordingPaused = signal(false);
   protected readonly recordingPauseSupported = signal(false);
   protected readonly recordingDurationMs = signal(0);
   protected readonly maxRecordingSeconds = MAX_RECORDING_DURATION_SECONDS;
+  protected readonly averageIntensity = computed(() => {
+    const values = this.events()
+      .map((event) => event.perceivedIntensity)
+      .filter((value): value is number => value !== null);
+    if (values.length === 0) {
+      return 'Non disponibile';
+    }
+    return (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1);
+  });
 
   protected readonly filteredEvents = computed(() => {
     const query = this.search().trim().toLowerCase();
@@ -164,13 +182,128 @@ export class App implements OnDestroy {
     private readonly storageService: NoiseStorageService,
     private readonly audioRecordingService: AudioRecordingService,
     private readonly audioClipRepository: AudioClipRepository,
+    private readonly vault: LocalVaultService,
   ) {
     void this.initialize();
   }
 
   ngOnDestroy(): void {
     this.audioRecordingService.cancel();
+    this.vault.lock();
     this.revokeAudioUrls();
+  }
+
+  protected async submitVaultAccess(): Promise<void> {
+    this.authError.set('');
+    const password = this.passwordInput();
+    const mode = this.authMode();
+    if (mode === 'setup') {
+      if (password.length < 12) {
+        this.authError.set('Scegli una password di almeno 12 caratteri.');
+        return;
+      }
+      if (password !== this.passwordConfirmation()) {
+        this.authError.set('Le password non coincidono.');
+        return;
+      }
+    } else if (mode !== 'locked') {
+      return;
+    }
+
+    this.authBusy.set(true);
+    try {
+      if (mode === 'setup') {
+        await this.vault.create(password);
+        this.authMode.set('locked');
+      } else {
+        await this.vault.unlock(password);
+      }
+      await this.loadPrivateDiary();
+      this.authMode.set('unlocked');
+      this.passwordInput.set('');
+      this.passwordConfirmation.set('');
+      this.authError.set('');
+    } catch (error) {
+      this.vault.lock();
+      this.clearPrivateDiary();
+      this.passwordInput.set('');
+      this.passwordConfirmation.set('');
+      this.authError.set(
+        error instanceof Error ? error.message : 'Impossibile sbloccare il diario locale.',
+      );
+    } finally {
+      this.authBusy.set(false);
+    }
+  }
+
+  protected lockDiary(): void {
+    if (this.recordingActive()) {
+      this.audioError.set('Ferma la registrazione prima di bloccare il diario.');
+      return;
+    }
+    this.vault.lock();
+    this.clearPrivateDiary();
+    this.authMode.set('locked');
+    this.passwordInput.set('');
+    this.passwordConfirmation.set('');
+    this.authError.set('');
+    this.storageError.set('');
+    this.audioError.set('');
+    this.audioStatus.set('');
+    this.importStatus.set('');
+  }
+
+  protected async importDiary(event: Event): Promise<void> {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) {
+      this.storageError.set('Seleziona un file JSON valido da importare.');
+      return;
+    }
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) {
+      return;
+    }
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      this.storageError.set('Seleziona un file con estensione .json.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      this.storageError.set('Il file supera il limite di 5 MB.');
+      return;
+    }
+
+    this.storageError.set('');
+    this.importStatus.set('');
+    try {
+      const importedEvents = this.storageService.parseImport(
+        JSON.parse(await file.text()) as unknown,
+      );
+      const existingIds = new Set(this.events().map((item) => item.id));
+      const newEvents = importedEvents.filter((item) => !existingIds.has(item.id));
+      if (newEvents.length === 0) {
+        this.importStatus.set('Tutti gli episodi del file sono già presenti nel diario.');
+        return;
+      }
+
+      const mergedEvents = [...this.events(), ...newEvents];
+      await this.storageService.saveEvents(mergedEvents);
+      this.events.set(mergedEvents);
+      this.selectedEventId.set(newEvents[0].id);
+      await this.loadAudioForEvent(newEvents[0].id);
+      const importedMessage =
+        newEvents.length === 1 ? 'Importato 1 episodio' : `Importati ${newEvents.length} episodi`;
+      const duplicateCount = importedEvents.length - newEvents.length;
+      const duplicateMessage =
+        duplicateCount === 1 ? '1 duplicato ignorato' : `${duplicateCount} duplicati ignorati`;
+      this.importStatus.set(
+        `${importedMessage}; ${duplicateMessage}. Il file sorgente resta in chiaro sul dispositivo; eliminalo se non ti serve più.`,
+      );
+    } catch (error) {
+      this.storageError.set(
+        error instanceof Error ? error.message : 'Impossibile importare il file selezionato.',
+      );
+    }
   }
 
   protected toggleForm(): void {
@@ -377,6 +510,9 @@ export class App implements OnDestroy {
   }
 
   protected downloadExport(): void {
+    if (this.authMode() !== 'unlocked') {
+      return;
+    }
     const payload = {
       exportedAt: new Date().toISOString(),
       source: 'Diario Rumore',
@@ -394,20 +530,37 @@ export class App implements OnDestroy {
 
   private async initialize(): Promise<void> {
     try {
+      this.authMode.set(this.vault.isConfigured() ? 'locked' : 'setup');
+    } catch (error) {
+      this.authMode.set('unavailable');
+      this.authError.set(
+        error instanceof Error ? error.message : 'Impossibile leggere la configurazione del diario.',
+      );
+    }
+  }
+
+  private async loadPrivateDiary(): Promise<void> {
+    this.loadingEvents.set(true);
+    try {
       const initialEvents = await this.storageService.loadEvents();
+      await this.audioClipRepository.encryptLegacyRecords();
       this.events.set(initialEvents);
       this.selectedEventId.set(initialEvents[0]?.id ?? null);
       this.storageError.set('');
       if (initialEvents[0]) {
         await this.loadAudioForEvent(initialEvents[0].id);
       }
-    } catch (error) {
-      this.storageError.set(
-        error instanceof Error ? error.message : 'Impossibile caricare gli episodi salvati sul dispositivo.',
-      );
     } finally {
       this.loadingEvents.set(false);
     }
+  }
+
+  private clearPrivateDiary(): void {
+    this.revokeAudioUrls();
+    this.events.set([]);
+    this.audioClips.set([]);
+    this.selectedEventId.set(null);
+    this.loadingEvents.set(false);
   }
 
   private async loadAudioForEvent(eventId: string): Promise<void> {

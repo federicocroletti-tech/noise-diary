@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
-import { NoiseEvent } from '../domain/noise-event.model';
+import { isNoiseEvent, NoiseEvent } from '../domain/noise-event.model';
+import { EncryptedPayload, isArrayBuffer, LocalVaultService } from './local-vault.service';
 
 const DATABASE_NAME = 'noise-diary';
 const DATABASE_VERSION = 2;
@@ -10,16 +11,47 @@ export class NoiseEventRepository {
   private databasePromise?: Promise<IDBDatabase>;
   private database?: IDBDatabase;
 
+  constructor(private readonly vault: LocalVaultService) {}
+
   async getAll(): Promise<NoiseEvent[]> {
     const database = await this.openDatabase();
-    return this.runTransaction(database, 'readonly', (store) => store.getAll());
+    const records = await this.runTransaction<unknown[]>(database, 'readonly', (store) =>
+      store.getAll(),
+    );
+    const needsMigration: NoiseEvent[] = [];
+    const events = await Promise.all(
+      records.map(async (record) => {
+        if (this.isEncryptedEvent(record)) {
+          const event = await this.vault.decryptJson(record, isNoiseEvent);
+          if (event.id !== record.id) {
+            throw new Error('Un episodio cifrato non corrisponde al suo ID di archivio.');
+          }
+          return event;
+        }
+        if (!isNoiseEvent(record)) {
+          throw new Error('Un episodio salvato non è leggibile; i dati locali non sono stati modificati.');
+        }
+        needsMigration.push(record);
+        return record;
+      }),
+    );
+    if (needsMigration.length > 0) {
+      await this.saveAll(events);
+    }
+    return events;
   }
 
   async saveAll(events: NoiseEvent[]): Promise<void> {
     const database = await this.openDatabase();
+    const encryptedEvents = await Promise.all(
+      events.map(async (event) => ({
+        id: event.id,
+        ...(await this.vault.encryptJson(event)),
+      })),
+    );
     await this.runTransaction(database, 'readwrite', (store) => {
       store.clear();
-      for (const event of events) {
+      for (const event of encryptedEvents) {
         store.put(event);
       }
       return store.getAllKeys();
@@ -30,6 +62,19 @@ export class NoiseEventRepository {
     this.database?.close();
     this.database = undefined;
     this.databasePromise = undefined;
+  }
+
+  private isEncryptedEvent(value: unknown): value is EncryptedPayload & { id: string } {
+    return (
+      value !== null &&
+      typeof value === 'object' &&
+      'id' in value &&
+      typeof value.id === 'string' &&
+      'iv' in value &&
+      isArrayBuffer(value.iv) &&
+      'ciphertext' in value &&
+      isArrayBuffer(value.ciphertext)
+    );
   }
 
   private openDatabase(): Promise<IDBDatabase> {
