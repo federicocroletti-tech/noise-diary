@@ -113,7 +113,7 @@ describe('NoiseStorageService', () => {
       startedAt: '2026-10-23T22:04:00.000Z',
       createdAt: '2026-10-25T00:00:00.000Z',
       updatedAt: '2026-10-25T00:00:00.000Z',
-      locationLabel: 'Via Perini 18, Milano',
+      locationLabel: 'Test location',
       room: '',
       eventType: 'UNKNOWN',
       continuityType: 'unknown',
