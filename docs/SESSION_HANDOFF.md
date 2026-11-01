@@ -10,14 +10,13 @@
 - Le fixture che contenevano un possibile dato residenziale sono state sostituite localmente con valori sintetici in `src/app/app.spec.ts` e `src/app/services/noise-storage.service.spec.ts`.
 - I branch `audit/repository-assessment` e `fix/sanitize-test-fixtures` derivano dal commit `c4b56b3`; il primo contiene i documenti audit, entrambi contengono la stessa sanificazione delle fixture.
 - PR #1 è stata integrata con squash nel commit `18bbba8`; PR #2 nel commit `c079e7a`. Entrambi i branch sono stati pushati e `main` locale è sincronizzato con `origin/main`.
-- [x] Committare e pubblicare i branch audit e fixture, poi integrarli in `main` senza force-push.
+- Nessun commit pubblico è stato riscritto. La cronologia remota precedente conserva ancora le fixture originali; questo handoff non include né riproduce il dato.
 
 ## Verifiche
 
-2. Leggere e approvare i documenti audit; risolvere le domande in [OPEN_QUESTIONS.md](./OPEN_QUESTIONS.md).
-3. Decidere separatamente se chiedere una bonifica della cronologia/cache pubblica. I commit normali non rimuovono i dati dalle revisioni precedenti; non usare force-push o purge senza autorizzazione esplicita e coordinamento con GitHub.
-4. Prima di nuove feature, stabilire i gate CI per evitare il ritorno di dati reali in test, documenti, screenshot e commit.
-5. Solo dopo l’approvazione dell’audit, pianificare `feat/noise-event-domain` con timezone, distinzione tra osservazioni/ipotesi, schema versionato e history delle correzioni.
+- `npm ci`: completato, 0 vulnerabilità riportate da npm.
+- `npm test`: 5 file, 18 test superati.
+- `npm run build`: superata; resta il warning preesistente sul budget di `src/app/app.scss`.
 
 - `git diff --check`: superato.
 - `npm run lint`: non superato per 57 file preesistenti.
@@ -31,11 +30,11 @@
 - [x] Creare i sette documenti della Fase 0.
 - [x] Sostituire le fixture con dati sintetici e verificare test/build.
 - [x] Conservare questo handoff e il prompt iniziale in documentazione versionata.
-- [ ] Committare e pubblicare i branch audit e fixture, poi integrarli in `main` senza force-push.
+- [x] Committare e pubblicare i branch audit e fixture, poi integrarli in `main` senza force-push.
 
 ### Prossima sessione
 
-1. Verificare che i branch siano stati committati, pushati e integrati in `main`; controllare la pipeline remota.
+1. Controllare i workflow e il deploy GitHub Pages dopo i merge in `main`.
 2. Leggere e approvare i documenti audit; risolvere le domande in [OPEN_QUESTIONS.md](./OPEN_QUESTIONS.md).
 3. Decidere separatamente se chiedere una bonifica della cronologia/cache pubblica. I commit normali non rimuovono i dati dalle revisioni precedenti; non usare force-push o purge senza autorizzazione esplicita e coordinamento con GitHub.
 4. Prima di nuove feature, stabilire gate CI per evitare dati reali in test, documenti, screenshot e commit.
