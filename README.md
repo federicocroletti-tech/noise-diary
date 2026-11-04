@@ -11,7 +11,7 @@ Diario Rumore è una PWA local-first per annotare episodi di rumore domestico e 
 - Registrazioni audio esplicitamente avviate dall'utente e salvate localmente in IndexedDB.
 - Contenuti guida pilota per documentare episodi di rumore senza trasformare osservazioni o ipotesi in accertamenti.
 
-**Limiti attuali:** l'applicazione non genera fascicoli, comunicazioni o PDF; l'esportazione non include le registrazioni audio; non supporta allegati immagine, modifica o cancellazione completa dei casi. La password protegge soltanto l'archivio locale: non esistono account online, sincronizzazione o recupero password. I file JSON esportati sono in chiaro e vanno conservati privatamente.
+**Limiti attuali:** l'applicazione non genera fascicoli, comunicazioni o PDF; l'esportazione non include le registrazioni audio; non supporta allegati immagine né cancellazione completa verificata del diario. La password protegge soltanto l'archivio locale: non esistono account online, sincronizzazione o recupero password. I file JSON esportati sono in chiaro e vanno conservati privatamente.
 
 ## Cosa non è
 
@@ -55,9 +55,11 @@ La sola sezione globale è [`jurisdictions/global/`](./jurisdictions/global/READ
 
 Al primo avvio, crea una password locale di almeno 12 caratteri. Scegli **Nuovo episodio** per annotare osservazioni e ipotesi; usa **Importa storico JSON** per aggiungere episodi validati senza sostituire quelli già presenti. L'importazione viene elaborata nel browser e non invia il file a un server. Gli episodi e le registrazioni vengono cifrati con AES-GCM in IndexedDB; la chiave è derivata dalla password e resta in memoria solo mentre il diario è sbloccato. **Blocca** cancella i dati decifrati dalla vista corrente. Consulta [la guida a cifratura e importazione locale](./docs/local-encrypted-import.md) prima di inserire dati reali.
 
+Un episodio può essere corretto indicando un motivo, conservato insieme alla versione precedente nella cronologia locale cifrata. Puoi anche eliminare un singolo episodio dopo una conferma: l'app rimuove dalla IndexedDB di questo browser l'episodio e le registrazioni audio associate. Questa eliminazione non garantisce la rimozione da backup, sincronizzazioni del profilo o altri dispositivi.
+
 Non esistono account online o sincronizzazione: la password è locale e non può essere reimpostata. Un'esportazione JSON contiene dati in chiaro; i file audio non sono inclusi nell'esportazione.
 
-La cancellazione completa dei dati non è ancora implementata. La cancellazione dei dati del browser o la disinstallazione non è una procedura affidabile di cancellazione verificata. Non inserire dati che non desideri conservare sul dispositivo; usa un'esportazione privata per avere una copia recuperabile.
+La cancellazione completa verificata del diario non è implementata. La cancellazione dei dati del browser o la disinstallazione non è una procedura affidabile di cancellazione verificata. Non inserire dati che non desideri conservare sul dispositivo; usa un'esportazione privata per avere una copia recuperabile.
 
 La generazione di lettere, PDF, ZIP o fascicoli non è attualmente disponibile nell'app. I modelli in `situations/noise/documents/` sono documenti di testo da copiare, verificare e personalizzare separatamente; l'indice editoriale viene rigenerato con `npm run content:check -- --write-index`.
 

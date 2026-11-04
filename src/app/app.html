@@ -6,7 +6,12 @@
     </div>
 
     <div class="header-actions" *ngIf="authMode() === 'unlocked'">
-      <button type="button" class="secondary" (click)="toggleForm()">
+      <button
+        type="button"
+        class="secondary"
+        (click)="toggleForm()"
+        [disabled]="editingEventId() !== null"
+      >
         {{ showForm() ? 'Nascondi modulo' : 'Nuovo episodio' }}
       </button>
       <button type="button" class="secondary" (click)="importInput.click()">Importa storico JSON</button>
@@ -15,7 +20,7 @@
         class="visually-hidden"
         type="file"
         accept=".json,application/json"
-        (change)="importDiary($event)"
+        (change)="importDiary($event, 'append')"
       />
       <button type="button" class="primary" (click)="downloadExport()">Esporta JSON</button>
       <button type="button" class="secondary" (click)="lockDiary()">Blocca</button>
@@ -112,7 +117,7 @@
 
     <section class="panel form-panel" *ngIf="showForm() && !loadingEvents()">
       <div class="section-heading">
-        <h2>Nuovo episodio</h2>
+        <h2>{{ editingEventId() ? 'Modifica episodio' : 'Nuovo episodio' }}</h2>
         <span>Riservato al dispositivo dell'utente</span>
       </div>
 
@@ -148,11 +153,15 @@
         </div>
 
         <div class="two-columns">
-          <label>
-            <span>Intensità percepita (1–5, soggettiva)</span>
-            <input type="range" min="1" max="5" step="1" [value]="draft().perceivedIntensity" (input)="onFieldChange('perceivedIntensity', +$any($event.target).value)" />
-            <small>{{ draft().perceivedIntensity }}/5 · valutazione personale</small>
-          </label>
+          <div>
+            <label>
+              <span>Intensità percepita (1–5, soggettiva)</span>
+              <input type="range" min="1" max="5" step="1" [value]="draft().perceivedIntensity" (input)="intensityUnreported.set(false); onFieldChange('perceivedIntensity', +$any($event.target).value)" />
+              <small *ngIf="intensityUnreported()">Non indicata; aggiungi una valutazione solo se vuoi.</small>
+              <small *ngIf="!intensityUnreported()">{{ draft().perceivedIntensity }}/5 · valutazione personale</small>
+            </label>
+            <button *ngIf="intensityUnreported()" type="button" class="secondary" (click)="intensityUnreported.set(false)">Indica un'intensità</button>
+          </div>
 
           <label>
             <span>Andamento</span>
@@ -163,12 +172,19 @@
         </div>
 
         <div class="two-columns">
-          <label>
+          <div *ngIf="effectsUnreported(); else effectsControl">
             <span>Effetto percepito</span>
-            <select [value]="draft().perceivedEffects" (change)="onFieldChange('perceivedEffects', $any($event.target).value)">
-              <option *ngFor="let option of perceivedEffectOptions" [value]="option" [selected]="option === draft().perceivedEffects">{{ labelFor(option) }}</option>
-            </select>
-          </label>
+            <p>Non indicato</p>
+            <button type="button" class="secondary" (click)="effectsUnreported.set(false)">Seleziona un effetto</button>
+          </div>
+          <ng-template #effectsControl>
+            <label>
+              <span>Effetto percepito</span>
+              <select [value]="draft().perceivedEffects" (change)="onFieldChange('perceivedEffects', $any($event.target).value)">
+                <option *ngFor="let option of perceivedEffectOptions" [value]="option" [selected]="option === draft().perceivedEffects">{{ labelFor(option) }}</option>
+              </select>
+            </label>
+          </ng-template>
           <label>
             <span>Stato</span>
             <select [value]="draft().status" (change)="onFieldChange('status', $any($event.target).value)">
@@ -209,7 +225,28 @@
           </label>
         </div>
 
-        <button type="submit" class="primary submit">Salva evento</button>
+        <label *ngIf="editingEventId()">
+          <span>Motivo della modifica (obbligatorio)</span>
+          <textarea
+            rows="2"
+            required
+            [value]="correctionReason()"
+            (input)="correctionReason.set($any($event.target).value)"
+            aria-describedby="correction-reason-help"
+          ></textarea>
+          <small id="correction-reason-help">
+            Il motivo e la versione precedente vengono conservati nella cronologia locale.
+          </small>
+        </label>
+
+        <div class="audio-file-actions">
+          <button type="submit" class="primary submit">
+            {{ editingEventId() ? 'Salva correzione' : 'Salva evento' }}
+          </button>
+          <button *ngIf="editingEventId()" type="button" class="secondary" (click)="cancelEdit()">
+            Annulla modifica
+          </button>
+        </div>
       </form>
     </section>
 
@@ -233,7 +270,16 @@
       </div>
 
       <ul class="event-list" *ngIf="filteredEvents().length; else emptyState">
-        <li *ngFor="let event of filteredEvents()" [class.active]="event.id === selectedEvent()?.id" (click)="selectEvent(event.id)">
+        <li
+          *ngFor="let event of filteredEvents()"
+          [class.active]="event.id === selectedEvent()?.id"
+          role="button"
+          tabindex="0"
+          [attr.aria-pressed]="event.id === selectedEvent()?.id"
+          [attr.aria-label]="'Seleziona episodio: ' + event.locationLabel"
+          (click)="selectEvent(event.id)"
+          (keydown)="onEventItemKeydown($event, event.id)"
+        >
           <div class="event-header">
             <strong>{{ event.locationLabel }}</strong>
             <span>{{ event.eventType }}</span>
@@ -261,6 +307,11 @@
         </div>
         <h3>{{ event.locationLabel }}</h3>
         <p>{{ event.description }}</p>
+      </div>
+
+      <div class="audio-file-actions">
+        <button type="button" class="secondary" (click)="beginEdit(event)" aria-label="Modifica episodio">Modifica episodio</button>
+        <button type="button" class="danger" (click)="deleteEvent(event)" aria-label="Elimina episodio">Elimina episodio</button>
       </div>
 
       <section class="audio-section" aria-labelledby="audio-heading">
@@ -379,6 +430,18 @@
           <li *ngFor="let effect of event.perceivedEffects">{{ labelFor(effect) }}</li>
         </ul>
       </div>
+
+      <details *ngIf="event.correctionHistory?.length">
+        <summary>Cronologia delle correzioni</summary>
+        <ol>
+          <li *ngFor="let correction of event.correctionHistory">
+            <time [attr.datetime]="correction.changedAt">
+              {{ correction.changedAt | date: 'dd MMM yyyy, HH:mm' }}
+            </time>
+            — {{ correction.reason }}
+          </li>
+        </ol>
+      </details>
     </aside>
   </main>
 

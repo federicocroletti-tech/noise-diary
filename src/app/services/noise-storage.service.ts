@@ -58,6 +58,10 @@ export class NoiseStorageService {
     await this.repository.saveAll(events);
   }
 
+  async deleteEvent(eventId: string): Promise<void> {
+    await this.repository.deleteEventAndAudio(eventId);
+  }
+
   parseImport(value: unknown): NoiseEvent[] {
     const candidate =
       Array.isArray(value) || !value || typeof value !== 'object'

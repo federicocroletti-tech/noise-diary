@@ -9,6 +9,7 @@ describe('App', () => {
   const storage = {
     loadEvents: vi.fn().mockResolvedValue([]),
     saveEvents: savedEvents,
+    deleteEvent: vi.fn().mockResolvedValue(undefined),
     parseImport: vi.fn(),
   };
   const vault = {
@@ -25,6 +26,7 @@ describe('App', () => {
   beforeEach(async () => {
     savedEvents.mockClear();
     storage.loadEvents.mockReset().mockResolvedValue([]);
+    storage.deleteEvent.mockReset().mockResolvedValue(undefined);
     storage.parseImport.mockReset();
     vault.isConfigured.mockReset().mockReturnValue(false);
     vault.create.mockReset().mockResolvedValue(undefined);
@@ -40,6 +42,10 @@ describe('App', () => {
         { provide: AudioClipRepository, useValue: audioClips },
       ],
     }).compileComponents();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   async function createVault(fixture: ComponentFixture<App>): Promise<void> {
@@ -110,6 +116,207 @@ describe('App', () => {
     expect(compiled.querySelector('button[aria-label^="Avvia registrazione per"]')).not.toBeNull();
   });
 
+  it('saves an edit with its reason and previous event snapshot', async () => {
+    const existingEvent = {
+      id: 'event-to-edit',
+      startedAt: '2026-10-22T22:04:00.000Z',
+      createdAt: '2026-10-22T22:05:00.000Z',
+      updatedAt: '2026-10-22T22:05:00.000Z',
+      locationLabel: 'Test location',
+      room: 'Soggiorno',
+      eventType: 'UNKNOWN',
+      continuityType: 'unknown',
+      perceivedIntensity: 2,
+      perceivedEffects: ['simple-observation'],
+      suspectedSource: 'Non identificata (ipotesi)',
+      description: 'Descrizione precedente.',
+      notes: '',
+      status: 'to-review',
+      tags: [],
+      attachmentIds: [],
+    };
+    storage.loadEvents.mockResolvedValue([existingEvent]);
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    await createVault(fixture);
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    compiled.querySelector<HTMLButtonElement>('button[aria-label="Modifica episodio"]')?.click();
+    fixture.detectChanges();
+    const description = compiled.querySelector<HTMLTextAreaElement>(
+      '.event-form textarea',
+    );
+    const reason = compiled.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-describedby="correction-reason-help"]',
+    );
+    if (!description || !reason) {
+      throw new Error('Edit form fields are missing.');
+    }
+    description.value = 'Descrizione corretta.';
+    description.dispatchEvent(new Event('input', { bubbles: true }));
+    reason.value = 'Correzione di un errore di trascrizione.';
+    reason.dispatchEvent(new Event('input', { bubbles: true }));
+    compiled.querySelector<HTMLButtonElement>('.event-form button[type="submit"]')?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(savedEvents).toHaveBeenCalledOnce();
+    const updatedEvent = savedEvents.mock.calls[0][0][0];
+    expect(updatedEvent).toMatchObject({
+      id: existingEvent.id,
+      createdAt: existingEvent.createdAt,
+      description: 'Descrizione corretta.',
+      correctionHistory: [
+        {
+          reason: 'Correzione di un errore di trascrizione.',
+          previousSnapshot: expect.any(String),
+        },
+      ],
+    });
+    expect(JSON.parse(updatedEvent.correctionHistory[0].previousSnapshot)).toMatchObject({
+      description: 'Descrizione precedente.',
+      updatedAt: existingEvent.updatedAt,
+    });
+    expect(compiled.textContent).toContain('Cronologia delle correzioni');
+  });
+
+  it('cancels editing without changing the saved event', async () => {
+    const existingEvent = {
+      id: 'event-edit-cancel',
+      startedAt: '2026-10-22T22:04:00.000Z',
+      createdAt: '2026-10-22T22:05:00.000Z',
+      updatedAt: '2026-10-22T22:05:00.000Z',
+      locationLabel: 'Test location',
+      room: 'Soggiorno',
+      eventType: 'UNKNOWN',
+      continuityType: 'unknown',
+      perceivedIntensity: 2,
+      perceivedEffects: ['simple-observation'],
+      suspectedSource: 'Non identificata (ipotesi)',
+      description: 'Originale.',
+      notes: '',
+      status: 'to-review',
+      tags: [],
+      attachmentIds: [],
+    };
+    storage.loadEvents.mockResolvedValue([existingEvent]);
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    await createVault(fixture);
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    compiled.querySelector<HTMLButtonElement>('button[aria-label="Modifica episodio"]')?.click();
+    fixture.detectChanges();
+    const description = compiled.querySelector<HTMLTextAreaElement>('.event-form textarea');
+    if (!description) {
+      throw new Error('Edit description field is missing.');
+    }
+    description.value = 'Modifica non salvata.';
+    description.dispatchEvent(new Event('input', { bubbles: true }));
+    [...compiled.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.includes('Annulla modifica'))
+      ?.click();
+    fixture.detectChanges();
+
+    expect(savedEvents).not.toHaveBeenCalled();
+    expect(compiled.querySelector('.event-form')).toBeNull();
+    expect(compiled.textContent).toContain('Originale.');
+  });
+
+  it('preserves unreported intensity and effects when correcting another field', async () => {
+    const existingEvent = {
+      id: 'event-with-unreported-values',
+      startedAt: '2026-10-22T22:04:00.000Z',
+      createdAt: '2026-10-22T22:05:00.000Z',
+      updatedAt: '2026-10-22T22:05:00.000Z',
+      locationLabel: 'Test location',
+      room: 'Soggiorno',
+      eventType: 'UNKNOWN',
+      continuityType: 'unknown',
+      perceivedIntensity: null,
+      perceivedEffects: [],
+      suspectedSource: 'Non identificata (ipotesi)',
+      description: 'Descrizione originale.',
+      notes: '',
+      status: 'to-review',
+      tags: [],
+      attachmentIds: [],
+    };
+    storage.loadEvents.mockResolvedValue([existingEvent]);
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    await createVault(fixture);
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    compiled.querySelector<HTMLButtonElement>('button[aria-label="Modifica episodio"]')?.click();
+    fixture.detectChanges();
+    const description = compiled.querySelector<HTMLTextAreaElement>('.event-form textarea');
+    const reason = compiled.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-describedby="correction-reason-help"]',
+    );
+    if (!description || !reason) {
+      throw new Error('Correction form fields are missing.');
+    }
+    description.value = 'Descrizione corretta.';
+    description.dispatchEvent(new Event('input', { bubbles: true }));
+    reason.value = 'Correzione descrittiva.';
+    reason.dispatchEvent(new Event('input', { bubbles: true }));
+    compiled.querySelector<HTMLButtonElement>('.event-form button[type="submit"]')?.click();
+    await fixture.whenStable();
+
+    expect(savedEvents.mock.calls[0][0][0]).toMatchObject({
+      perceivedIntensity: null,
+      perceivedEffects: [],
+      description: 'Descrizione corretta.',
+    });
+  });
+
+  it('requires confirmation before deleting an event and its associated audio', async () => {
+    const existingEvent = {
+      id: 'event-to-delete',
+      startedAt: '2026-10-22T22:04:00.000Z',
+      createdAt: '2026-10-22T22:05:00.000Z',
+      updatedAt: '2026-10-22T22:05:00.000Z',
+      locationLabel: 'Test location',
+      room: 'Soggiorno',
+      eventType: 'UNKNOWN',
+      continuityType: 'unknown',
+      perceivedIntensity: 2,
+      perceivedEffects: ['simple-observation'],
+      suspectedSource: 'Non identificata (ipotesi)',
+      description: 'Synthetic event to delete.',
+      notes: '',
+      status: 'to-review',
+      tags: [],
+      attachmentIds: ['synthetic-audio-id'],
+    };
+    storage.loadEvents.mockResolvedValue([existingEvent]);
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    await createVault(fixture);
+    const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    compiled.querySelector<HTMLButtonElement>('button[aria-label="Elimina episodio"]')?.click();
+    await fixture.whenStable();
+    expect(storage.deleteEvent).not.toHaveBeenCalled();
+    expect(compiled.textContent).toContain('Synthetic event to delete.');
+
+    confirmation.mockReturnValue(true);
+    compiled.querySelector<HTMLButtonElement>('button[aria-label="Elimina episodio"]')?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(storage.deleteEvent).toHaveBeenCalledOnce();
+    expect(storage.deleteEvent).toHaveBeenCalledWith(existingEvent.id);
+    expect(compiled.textContent).toContain('Nessun episodio nel diario');
+    expect(compiled.textContent).toContain('eliminati dall’archivio di questo browser');
+  });
+
   it('imports validated events into encrypted local history and skips existing IDs', async () => {
     const existingEvent = {
       id: 'existing-event',
@@ -170,7 +377,9 @@ describe('App', () => {
     expect(storage.parseImport).toHaveBeenCalledOnce();
     expect(savedEvents).toHaveBeenCalledOnce();
     expect(savedEvents.mock.calls[0][0]).toEqual([existingEvent, importedEvent]);
-    expect(compiled.textContent).toContain('Importato 1 episodio; 1 duplicato ignorato.');
+    expect(compiled.textContent).toContain(
+      'Aggiunto o aggiornato 1 episodio; mantenuto 1 elemento locale non sostituito.',
+    );
     expect(compiled.textContent).toContain('Non disponibile');
   });
 });

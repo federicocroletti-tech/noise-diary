@@ -5,6 +5,7 @@ import { EncryptedPayload, isArrayBuffer, LocalVaultService } from './local-vaul
 const DATABASE_NAME = 'noise-diary';
 const DATABASE_VERSION = 2;
 const STORE_NAME = 'noise-events';
+const AUDIO_STORE_NAME = 'audio-clips';
 
 @Injectable({ providedIn: 'root' })
 export class NoiseEventRepository {
@@ -55,6 +56,32 @@ export class NoiseEventRepository {
         store.put(event);
       }
       return store.getAllKeys();
+    });
+  }
+
+  async deleteEventAndAudio(eventId: string): Promise<void> {
+    const database = await this.openDatabase();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction([STORE_NAME, AUDIO_STORE_NAME], 'readwrite');
+      transaction.objectStore(STORE_NAME).delete(eventId);
+
+      const audioStore = transaction.objectStore(AUDIO_STORE_NAME);
+      const request = audioStore.index('eventId').openKeyCursor(IDBKeyRange.only(eventId));
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (cursor) {
+          audioStore.delete(cursor.primaryKey);
+          cursor.continue();
+        }
+      };
+      request.onerror = () =>
+        reject(request.error ?? new Error('Impossibile trovare le registrazioni associate.'));
+
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () =>
+        reject(transaction.error ?? new Error('Eliminazione episodio annullata.'));
+      transaction.onerror = () =>
+        reject(transaction.error ?? new Error('Eliminazione episodio non riuscita.'));
     });
   }
 
