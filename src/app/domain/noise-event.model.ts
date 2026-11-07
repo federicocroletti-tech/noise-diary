@@ -13,7 +13,7 @@ export const NOISE_EVENT_TYPES = [
 ] as const;
 
 export type NoiseEventType = (typeof NOISE_EVENT_TYPES)[number];
-export const EVENT_STATUSES = ['draft', 'complete', 'to-review', 'exported', 'archived'] as const;
+export const EVENT_STATUSES = ['draft', 'complete', 'to-review', 'corrected', 'exported', 'archived'] as const;
 export type EventStatus = (typeof EVENT_STATUSES)[number];
 export const CONTINUITY_TYPES = [
   'continuous',
@@ -112,6 +112,12 @@ export interface AuditEvent {
   description: string;
 }
 
+export interface NoiseEventCorrection {
+  changedAt: string;
+  reason: string;
+  previousSnapshot: string;
+}
+
 export interface NoiseEvent {
   id: string;
   startedAt: string;
@@ -137,6 +143,7 @@ export interface NoiseEvent {
   attachmentIds: string[];
   backgroundRecordingId?: string;
   deletedAt?: string;
+  correctionHistory?: NoiseEventCorrection[];
 }
 
 export interface NoiseEventDraft {
@@ -159,6 +166,33 @@ export interface NoiseEventDraft {
 }
 
 type NoiseEventCandidate = { [K in keyof NoiseEvent]?: unknown };
+
+function isCorrectionHistory(value: unknown): value is NoiseEventCorrection[] {
+  return (
+    Array.isArray(value) &&
+    value.every((entry) => {
+      if (
+        entry === null ||
+        typeof entry !== 'object' ||
+        !('changedAt' in entry) ||
+        typeof entry.changedAt !== 'string' ||
+        !Number.isFinite(Date.parse(entry.changedAt)) ||
+        !('reason' in entry) ||
+        typeof entry.reason !== 'string' ||
+        !entry.reason.trim() ||
+        !('previousSnapshot' in entry) ||
+        typeof entry.previousSnapshot !== 'string'
+      ) {
+        return false;
+      }
+      try {
+        return isNoiseEvent(JSON.parse(entry.previousSnapshot) as unknown);
+      } catch {
+        return false;
+      }
+    })
+  );
+}
 
 export function isNoiseEvent(value: unknown): value is NoiseEvent {
   if (value === null || typeof value !== 'object') {
@@ -212,6 +246,7 @@ export function isNoiseEvent(value: unknown): value is NoiseEvent {
     event.attachmentIds.every((id) => typeof id === 'string') &&
     (event.backgroundRecordingId === undefined || typeof event.backgroundRecordingId === 'string') &&
     (event.deletedAt === undefined ||
-      (typeof event.deletedAt === 'string' && Number.isFinite(Date.parse(event.deletedAt))))
+      (typeof event.deletedAt === 'string' && Number.isFinite(Date.parse(event.deletedAt)))) &&
+    (event.correctionHistory === undefined || isCorrectionHistory(event.correctionHistory))
   );
 }

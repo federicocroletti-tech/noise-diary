@@ -23,7 +23,7 @@ Diario Rumore è, nella fase corrente, uno strumento personale per organizzare a
 ## Dati e conservazione
 
 - Preferire minimizzazione e local-first; nessun backend pubblico è necessario per il prototipo e l’app non deve caricare dati automaticamente su servizi cloud.
-- Episodi e audio sono cifrati localmente prima della persistenza in IndexedDB. La password è locale e non recuperabile; l’export JSON è una copia separata non cifrata.
+- Episodi e audio sono cifrati localmente prima della persistenza in IndexedDB. Una chiave di recupero locale consente di impostare una nuova password; chi la possiede può accedere ai dati. L’export JSON è una copia separata non cifrata.
 - La cancellazione completa/verificata non è implementata. Eliminazione dal browser, disinstallazione o rimozione di un singolo file non garantiscono la cancellazione di copie, backup, sincronizzazioni del profilo o cronologia Git.
 - Definire retention, backup cifrato, ripristino, cancellazione e gestione delle copie prima di trattare dati reali su più dispositivi.
 - Non inserire dati reali nei test, nelle fixture, negli screenshot, nel repository, nelle issue o nella documentazione. Le fixture devono essere sintetiche.
