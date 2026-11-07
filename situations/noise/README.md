@@ -14,7 +14,7 @@ Questa guida aiuta a organizzare osservazioni e documenti relativi a rumori perc
 8. **Comunicazione formale:** valuta un testo scritto solo dopo avere verificato destinatario, fatti, giurisdizione e possibili conseguenze con un professionista quando opportuno.
 9. **Prepara i documenti:** usa i modelli in [`documents/`](./documents/README.md) come bozze; personalizza e controlla ogni affermazione.
 10. **Fascicolo:** ordina cronologia, prove e comunicazioni secondo [`forms/chronology-template.md`](./forms/chronology-template.md).
-11. **Esporta:** l'app attuale esporta solo metadati degli episodi in JSON; non genera fascicoli e non include audio.
+11. **Esporta:** l'app crea un backup locale cifrato di episodi e registrazioni audio; non genera fascicoli o documenti PDF.
 12. **Verifica locale:** autorità, procedure, norme, orari, limiti, termini e modalità di registrazione richiedono verifica per Paese e territorio. Questa guida non li specifica.
 
 ## Azioni da non compiere

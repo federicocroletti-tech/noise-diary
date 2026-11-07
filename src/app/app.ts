@@ -19,10 +19,12 @@ import {
   PerceivedEffect,
   PERCEIVED_EFFECTS,
 } from './domain/noise-event.model';
+import { LocalBackupService } from './services/local-backup.service';
 
 type SortMode = 'recent' | 'intensity' | 'room';
 type DiaryView = 'list' | 'form' | 'detail';
 type ImportChoice = 'keep-current' | 'use-file';
+const MAX_BACKUP_FILE_SIZE = 120 * 1024 * 1024;
 
 interface ImportConflict {
   current: NoiseEvent;
@@ -34,6 +36,7 @@ interface PendingAppendImport {
   additions: NoiseEvent[];
   conflicts: ImportConflict[];
   duplicateCount: number;
+  audioClips: AudioClip[];
 }
 
 function currentLocalDateTime(): string {
@@ -102,6 +105,13 @@ export class App implements OnDestroy {
   );
   protected readonly passwordInput = signal('');
   protected readonly passwordConfirmation = signal('');
+  protected readonly recoveryKeyInput = signal('');
+  protected readonly recoveryPassword = signal('');
+  protected readonly recoveryPasswordConfirmation = signal('');
+  protected readonly recoveryMode = signal(false);
+  protected readonly recoveryCode = signal('');
+  protected readonly recoveryCodeSaved = signal(false);
+  protected readonly recoveryNotice = signal('');
   protected readonly authError = signal('');
   protected readonly authBusy = signal(false);
   protected readonly showForm = signal(true);
@@ -232,6 +242,7 @@ export class App implements OnDestroy {
     private readonly audioRecordingService: AudioRecordingService,
     private readonly audioClipRepository: AudioClipRepository,
     private readonly vault: LocalVaultService,
+    private readonly backupService: LocalBackupService,
   ) {
     void this.initialize();
   }
@@ -261,14 +272,18 @@ export class App implements OnDestroy {
 
     this.authBusy.set(true);
     try {
+      let generatedRecoveryKey: string | null;
       if (mode === 'setup') {
-        await this.vault.create(password);
+        generatedRecoveryKey = await this.vault.create(password);
         this.authMode.set('locked');
       } else {
-        await this.vault.unlock(password);
+        generatedRecoveryKey = await this.vault.unlock(password);
       }
       await this.loadPrivateDiary();
       this.authMode.set('unlocked');
+      if (generatedRecoveryKey) {
+        this.presentRecoveryKey(generatedRecoveryKey);
+      }
       this.passwordInput.set('');
       this.passwordConfirmation.set('');
       this.authError.set('');
@@ -283,6 +298,105 @@ export class App implements OnDestroy {
     } finally {
       this.authBusy.set(false);
     }
+  }
+
+  protected async recoverDiary(): Promise<void> {
+    this.authError.set('');
+    const newPassword = this.recoveryPassword();
+    if (newPassword.length < 12) {
+      this.authError.set('La nuova password deve contenere almeno 12 caratteri.');
+      return;
+    }
+    if (newPassword !== this.recoveryPasswordConfirmation()) {
+      this.authError.set('Le nuove password non coincidono.');
+      return;
+    }
+
+    this.authBusy.set(true);
+    try {
+      const newRecoveryKey = await this.vault.recover(this.recoveryKeyInput(), newPassword);
+      await this.loadPrivateDiary();
+      this.authMode.set('unlocked');
+      this.recoveryMode.set(false);
+      this.recoveryKeyInput.set('');
+      this.recoveryPassword.set('');
+      this.recoveryPasswordConfirmation.set('');
+      this.presentRecoveryKey(newRecoveryKey);
+      this.authError.set('');
+    } catch (error) {
+      this.vault.lock();
+      this.clearPrivateDiary();
+      this.authError.set(
+        error instanceof Error ? error.message : 'Impossibile recuperare il diario locale.',
+      );
+    } finally {
+      this.authBusy.set(false);
+    }
+  }
+
+  protected toggleRecoveryMode(): void {
+    this.recoveryMode.update((value) => !value);
+    this.authError.set('');
+  }
+
+  protected finishRecoverySetup(): void {
+    if (!this.recoveryCodeSaved()) {
+      return;
+    }
+    try {
+      this.vault.commitRecoveryChange();
+      this.recoveryCode.set('');
+      this.recoveryCodeSaved.set(false);
+      this.recoveryNotice.set('Chiave di recupero salvata e attivata.');
+    } catch (error) {
+      this.storageError.set(
+        error instanceof Error ? error.message : 'Impossibile attivare il recupero del diario.',
+      );
+    }
+  }
+
+  protected async rotateRecoveryKey(): Promise<void> {
+    if (
+      !window.confirm(
+        'Rigenerare la chiave di recupero? Quella precedente smetterà di funzionare quando confermerai la nuova chiave.',
+      )
+    ) {
+      return;
+    }
+    try {
+      const recoveryKey = await this.vault.rotateRecoveryKey();
+      this.presentRecoveryKey(recoveryKey);
+      this.recoveryNotice.set('');
+    } catch (error) {
+      this.storageError.set(
+        error instanceof Error ? error.message : 'Impossibile rigenerare la chiave di recupero.',
+      );
+    }
+  }
+
+  protected downloadRecoveryKey(): void {
+    const recoveryKey = this.recoveryCode();
+    if (!recoveryKey) {
+      return;
+    }
+    const blob = new Blob(
+      [
+        `Diario Rumore - chiave di recupero\n\n${recoveryKey}\n\nConserva questo file separatamente dal dispositivo e dalla password principale. Chiunque abbia questa chiave può impostare una nuova password per il diario.\n`,
+      ],
+      { type: 'text/plain;charset=utf-8' },
+    );
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'diario-rumore-chiave-recupero.txt';
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  private presentRecoveryKey(recoveryKey: string): void {
+    this.recoveryCode.set(recoveryKey);
+    this.recoveryCodeSaved.set(false);
+    this.recoveryNotice.set('');
   }
 
   protected lockDiary(): void {
@@ -305,7 +419,7 @@ export class App implements OnDestroy {
   protected async importDiary(event: Event, mode: 'replace' | 'append'): Promise<void> {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) {
-      this.storageError.set('Seleziona un file JSON valido da importare.');
+      this.storageError.set('Seleziona un backup Diario Rumore valido da importare.');
       return;
     }
     const file = input.files?.[0];
@@ -313,44 +427,71 @@ export class App implements OnDestroy {
     if (!file) {
       return;
     }
-    if (!file.name.toLowerCase().endsWith('.json')) {
-      this.storageError.set('Seleziona un file con estensione .json.');
+    if (!/\.(?:json|ndbackup)$/i.test(file.name)) {
+      this.storageError.set('Seleziona un file .ndbackup o un JSON storico.');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      this.storageError.set('Il file supera il limite di 5 MB.');
+    if (file.size > MAX_BACKUP_FILE_SIZE) {
+      this.storageError.set('Il backup supera il limite di 120 MiB.');
       return;
     }
 
     this.storageError.set('');
     this.importStatus.set('');
     try {
-      const importedEvents = this.storageService.parseImport(
-        JSON.parse(await file.text()) as unknown,
-      );
+      const contents: unknown = JSON.parse(await file.text());
+      let importedEvents: NoiseEvent[];
+      let importedClips: AudioClip[] = [];
+      if (this.backupService.isEncryptedEnvelope(contents)) {
+        const password = window.prompt(
+          'Inserisci la password principale usata per cifrare questo backup.',
+        );
+        if (password === null) {
+          this.importStatus.set('Importazione annullata; nessun episodio è stato modificato.');
+          return;
+        }
+        const backup = await this.backupService.decrypt(contents, password);
+        importedEvents = backup.events.length
+          ? this.storageService.parseImport(backup.events)
+          : [];
+        importedClips = backup.audioClips;
+      } else {
+        if (
+          !window.confirm(
+            'Questo JSON storico non è cifrato e non contiene registrazioni audio. Importarlo solo se proviene da una fonte attendibile?',
+          )
+        ) {
+          this.importStatus.set('Importazione annullata; nessun episodio è stato modificato.');
+          return;
+        }
+        importedEvents = this.storageService.parseImport(contents);
+      }
 
       if (mode === 'replace') {
         if (
           !confirm(
-            'Sostituire tutti gli episodi locali con quelli del file? Le registrazioni audio locali esistenti verranno eliminate.',
+            'Sostituire tutti gli episodi e le registrazioni locali con quelli del backup? Le registrazioni locali non presenti nel backup verranno eliminate.',
           )
         ) {
           return;
         }
-        const existingClips: AudioClip[] = [];
-        for (const existingEvent of this.events()) {
-          existingClips.push(...(await this.audioClipRepository.listByEvent(existingEvent.id)));
-        }
-        await this.storageService.saveEvents(importedEvents);
+        await this.storageService.saveEventsAndClips(importedEvents, importedClips, true);
         this.events.set(importedEvents);
         this.selectedEventId.set(importedEvents[0]?.id ?? null);
         this.activeView.set('list');
         this.revokeAudioUrls();
         this.audioClips.set([]);
-        for (const clip of existingClips) {
-          await this.audioClipRepository.delete(clip.id);
+        if (importedEvents[0]) {
+          await this.loadAudioForEvent(importedEvents[0].id);
         }
-        this.importStatus.set(`Sostituiti tutti gli episodi con ${importedEvents.length} elementi dal file.`);
+        this.importStatus.set(
+          `Sostituiti gli episodi con ${importedEvents.length} elementi e importate ${importedClips.length} registrazioni audio dal backup.`,
+        );
+        return;
+      }
+
+      if (importedEvents.length === 0) {
+        this.importStatus.set('Il backup non contiene episodi; nessun dato è stato modificato.');
         return;
       }
 
@@ -370,11 +511,11 @@ export class App implements OnDestroy {
       }
 
       if (conflicts.length > 0) {
-        this.pendingAppendImport.set({ additions, conflicts, duplicateCount });
+        this.pendingAppendImport.set({ additions, conflicts, duplicateCount, audioClips: importedClips });
         this.importStatus.set('Rivedi gli episodi con lo stesso ID prima di completare l’importazione.');
         return;
       }
-      await this.applyAppendImport(additions, [], duplicateCount);
+      await this.applyAppendImport(additions, [], duplicateCount, importedClips);
     } catch (error) {
       this.storageError.set(
         error instanceof Error ? error.message : 'Impossibile importare il file selezionato.',
@@ -406,7 +547,12 @@ export class App implements OnDestroy {
       return;
     }
     try {
-      await this.applyAppendImport(pending.additions, pending.conflicts, pending.duplicateCount);
+      await this.applyAppendImport(
+        pending.additions,
+        pending.conflicts,
+        pending.duplicateCount,
+        pending.audioClips,
+      );
       this.pendingAppendImport.set(null);
     } catch (error) {
       this.storageError.set(
@@ -419,6 +565,7 @@ export class App implements OnDestroy {
     additions: NoiseEvent[],
     conflicts: ImportConflict[],
     duplicateCount: number,
+    audioClips: AudioClip[],
   ): Promise<void> {
     const mergedById = new Map(this.events().map((item) => [item.id, item]));
     for (const addition of additions) {
@@ -430,10 +577,40 @@ export class App implements OnDestroy {
       }
     }
     const mergedEvents = [...mergedById.values()];
-    await this.storageService.saveEvents(mergedEvents);
+    const retainedEventIds = new Set(
+      conflicts.filter((conflict) => conflict.choice === 'keep-current').map((conflict) => conflict.current.id),
+    );
+    const acceptedClips = audioClips.filter((clip) => !retainedEventIds.has(clip.eventId));
+    const existingClips = await this.audioClipRepository.getByIds(
+      acceptedClips.map((clip) => clip.id),
+    );
+    const existingById = new Map(existingClips.map((clip) => [clip.id, clip]));
+    const clipsToSave: AudioClip[] = [];
+    for (const clip of acceptedClips) {
+      const existing = existingById.get(clip.id);
+      if (!existing) {
+        clipsToSave.push(clip);
+      } else if (
+        existing.eventId !== clip.eventId ||
+        existing.sha256 !== clip.sha256 ||
+        existing.sizeBytes !== clip.sizeBytes
+      ) {
+        throw new Error(
+          `La registrazione "${clip.fileName}" ha un ID già usato per contenuti diversi; nessun dato è stato importato.`,
+        );
+      }
+    }
+    if (clipsToSave.length > 0) {
+      await this.storageService.saveEventsAndClips(mergedEvents, clipsToSave);
+    } else {
+      await this.storageService.saveEvents(mergedEvents);
+    }
     this.events.set(mergedEvents);
     const importedCount = additions.length + conflicts.filter((item) => item.choice === 'use-file').length;
-    const nextSelectedId = additions[0]?.id ?? conflicts.find((item) => item.choice === 'use-file')?.incoming.id;
+    const nextSelectedId =
+      additions[0]?.id ??
+      conflicts.find((item) => item.choice === 'use-file')?.incoming.id ??
+      clipsToSave[0]?.eventId;
     if (nextSelectedId) {
       this.selectedEventId.set(nextSelectedId);
       await this.loadAudioForEvent(nextSelectedId);
@@ -449,7 +626,7 @@ export class App implements OnDestroy {
         ? 'mantenuto 1 elemento locale non sostituito'
         : `mantenuti ${duplicateSummary} elementi locali non sostituiti`;
     this.importStatus.set(
-      `${importedMessage}; ${retainedMessage}.`,
+      `${importedMessage}; ${retainedMessage}; importate ${clipsToSave.length} registrazioni audio.`,
     );
   }
 
@@ -824,23 +1001,42 @@ export class App implements OnDestroy {
       .padStart(2, '0')}:${(totalSeconds % 60).toString().padStart(2, '0')}`;
   }
 
-  protected downloadExport(): void {
+  protected async downloadExport(): Promise<void> {
     if (this.authMode() !== 'unlocked') {
       return;
     }
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      source: 'Diario Rumore',
-      events: this.events(),
-    };
-
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'diario-rumore-export.json';
-    anchor.click();
-    URL.revokeObjectURL(url);
+    const password = window.prompt('Inserisci la password principale per cifrare il backup.');
+    if (password === null) {
+      return;
+    }
+    this.storageError.set('');
+    try {
+      const audioClips = (
+        await Promise.all(
+          this.events().map((diaryEvent) =>
+            this.audioClipRepository.listByEvent(diaryEvent.id),
+          ),
+        )
+      ).flat();
+      const serialized = await this.backupService.encrypt(this.events(), audioClips, password);
+      const blob = new Blob([serialized], { type: 'application/json' });
+      if (blob.size > MAX_BACKUP_FILE_SIZE) {
+        throw new Error('Il backup supera il limite di 120 MiB e non può essere esportato in un unico file.');
+      }
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'diario-rumore-backup.ndbackup';
+      anchor.click();
+      URL.revokeObjectURL(url);
+      this.importStatus.set(
+        `Backup cifrato creato con ${this.events().length} episodi e ${audioClips.length} registrazioni audio.`,
+      );
+    } catch (error) {
+      this.storageError.set(
+        error instanceof Error ? error.message : 'Impossibile creare il backup cifrato.',
+      );
+    }
   }
 
   private async initialize(): Promise<void> {
@@ -882,6 +1078,13 @@ export class App implements OnDestroy {
     this.draft.set({ ...EMPTY_DRAFT, startedAt: currentLocalDateTime() });
     this.showForm.set(true);
     this.pendingAppendImport.set(null);
+    this.recoveryCode.set('');
+    this.recoveryCodeSaved.set(false);
+    this.recoveryNotice.set('');
+    this.recoveryMode.set(false);
+    this.recoveryKeyInput.set('');
+    this.recoveryPassword.set('');
+    this.recoveryPasswordConfirmation.set('');
     this.importStatus.set('');
     this.storageError.set('');
     this.loadingEvents.set(false);

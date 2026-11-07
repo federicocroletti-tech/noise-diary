@@ -1,5 +1,9 @@
 import { Injectable } from '@angular/core';
-import { AudioClip, AudioClipMetadata } from './models/audio-clip.model';
+import {
+  AudioClip,
+  AudioClipMetadata,
+  isAudioClipMetadata,
+} from './models/audio-clip.model';
 import {
   EncryptedPayload,
   isArrayBuffer,
@@ -10,9 +14,35 @@ const DATABASE_NAME = 'noise-diary';
 const DATABASE_VERSION = 2;
 const STORE_NAME = 'audio-clips';
 
-interface EncryptedAudioClip extends EncryptedPayload {
+export interface EncryptedAudioClip extends EncryptedPayload {
   id: string;
   eventId: string;
+}
+
+export async function encryptAudioClip(
+  clip: AudioClip,
+  vault: LocalVaultService,
+): Promise<EncryptedAudioClip> {
+  const metadata: AudioClipMetadata = {
+    id: clip.id,
+    eventId: clip.eventId,
+    kind: clip.kind,
+    fileName: clip.fileName,
+    mimeType: clip.mimeType,
+    sizeBytes: clip.sizeBytes,
+    durationMs: clip.durationMs,
+    createdAt: clip.createdAt,
+    sha256: clip.sha256,
+    origin: clip.origin,
+    device: clip.device,
+  };
+  const metadataBytes = new TextEncoder().encode(JSON.stringify(metadata));
+  const audioBytes = new Uint8Array(await clip.blob.arrayBuffer());
+  const plaintext = new Uint8Array(4 + metadataBytes.length + audioBytes.length);
+  new DataView(plaintext.buffer).setUint32(0, metadataBytes.length);
+  plaintext.set(metadataBytes, 4);
+  plaintext.set(audioBytes, 4 + metadataBytes.length);
+  return { id: clip.id, eventId: clip.eventId, ...(await vault.encryptBytes(plaintext)) };
 }
 
 @Injectable({ providedIn: 'root' })
@@ -24,29 +54,8 @@ export class AudioClipRepository {
 
   async save(clip: AudioClip): Promise<void> {
     const database = await this.openDatabase();
-    const metadata: AudioClipMetadata = {
-      id: clip.id,
-      eventId: clip.eventId,
-      kind: clip.kind,
-      fileName: clip.fileName,
-      mimeType: clip.mimeType,
-      sizeBytes: clip.sizeBytes,
-      durationMs: clip.durationMs,
-      createdAt: clip.createdAt,
-      sha256: clip.sha256,
-      origin: clip.origin,
-      device: clip.device,
-    };
-    const metadataBytes = new TextEncoder().encode(JSON.stringify(metadata));
-    const audioBytes = new Uint8Array(await clip.blob.arrayBuffer());
-    const plaintext = new Uint8Array(4 + metadataBytes.length + audioBytes.length);
-    new DataView(plaintext.buffer).setUint32(0, metadataBytes.length);
-    plaintext.set(metadataBytes, 4);
-    plaintext.set(audioBytes, 4 + metadataBytes.length);
-    const encrypted = await this.vault.encryptBytes(plaintext);
-    await this.runTransaction(database, 'readwrite', (store) =>
-      store.put({ id: clip.id, eventId: clip.eventId, ...encrypted }),
-    );
+    const encrypted = await encryptAudioClip(clip, this.vault);
+    await this.runTransaction(database, 'readwrite', (store) => store.put(encrypted));
   }
 
   async listByEvent(eventId: string): Promise<AudioClip[]> {
@@ -54,6 +63,46 @@ export class AudioClipRepository {
     const records = await this.runTransaction<unknown[]>(database, 'readonly', (store) =>
       store.index('eventId').getAll(eventId),
     );
+    return this.decodeRecords(records);
+  }
+
+  async getByIds(ids: string[]): Promise<AudioClip[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    const database = await this.openDatabase();
+    const records = await new Promise<unknown[]>((resolve, reject) => {
+      const transaction = database.transaction(STORE_NAME, 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const found: unknown[] = [];
+      let completedRequests = 0;
+      const requests = ids.map((id) => store.get(id));
+      for (const request of requests) {
+        request.onsuccess = () => {
+          if (request.result !== undefined) {
+            found.push(request.result);
+          }
+          completedRequests += 1;
+        };
+        request.onerror = () =>
+          reject(request.error ?? new Error('Impossibile leggere le registrazioni richieste.'));
+      }
+      transaction.oncomplete = () => {
+        if (completedRequests === requests.length) {
+          resolve(found);
+        } else {
+          reject(new Error('La lettura delle registrazioni è incompleta.'));
+        }
+      };
+      transaction.onabort = () =>
+        reject(transaction.error ?? new Error('Lettura delle registrazioni annullata.'));
+      transaction.onerror = () =>
+        reject(transaction.error ?? new Error('Lettura delle registrazioni non riuscita.'));
+    });
+    return this.decodeRecords(records);
+  }
+
+  private async decodeRecords(records: unknown[]): Promise<AudioClip[]> {
     const legacyClips: AudioClip[] = [];
     const clips = await Promise.all(
       records.map(async (record) => {
@@ -174,28 +223,7 @@ export class AudioClipRepository {
       return false;
     }
     const metadata = value as Record<string, unknown>;
-    return (
-      typeof metadata['id'] === 'string' &&
-      typeof metadata['eventId'] === 'string' &&
-      (metadata['kind'] === 'event' || metadata['kind'] === 'background') &&
-      typeof metadata['fileName'] === 'string' &&
-      typeof metadata['mimeType'] === 'string' &&
-      typeof metadata['sizeBytes'] === 'number' &&
-      Number.isFinite(metadata['sizeBytes']) &&
-      metadata['sizeBytes'] >= 0 &&
-      typeof metadata['durationMs'] === 'number' &&
-      Number.isFinite(metadata['durationMs']) &&
-      metadata['durationMs'] >= 0 &&
-      typeof metadata['createdAt'] === 'string' &&
-      Number.isFinite(Date.parse(metadata['createdAt'])) &&
-      typeof metadata['sha256'] === 'string' &&
-      /^[a-f0-9]{64}$/i.test(metadata['sha256']) &&
-      metadata['origin'] === 'microphone' &&
-      metadata['device'] !== null &&
-      typeof metadata['device'] === 'object' &&
-      'platform' in metadata['device'] &&
-      typeof metadata['device']['platform'] === 'string'
-    );
+    return isAudioClipMetadata(metadata);
   }
 
   private openDatabase(): Promise<IDBDatabase> {

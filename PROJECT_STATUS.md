@@ -28,37 +28,37 @@
 
 ## 3. Funzionalità presenti
 
-| Funzionalità | Stato ed evidenza | Verifica |
-|---|---|---|
-| Creazione di una bozza evento | Presente: il form raccoglie data/ora, stanza, intensità percepita e contesto. La stanza non è obbligatoria. | Test componente incluso in `npm test`. |
-| Consultazione, ricerca e ordinamento | Presente: lista con ricerca testuale e ordinamento per data, intensità o stanza; non è una tabella. | Ispezione di [src/app/app.html](./src/app/app.html) e [src/app/app.ts](./src/app/app.ts). |
-| Modifica evento | Presente: richiede un motivo, salva uno snapshot precedente e mantiene la cronologia nell'evento locale cifrato. | Test componente per salvataggio, annullamento e conservazione dei valori non indicati; `npm test` superato. |
-| Eliminazione evento | Presente: richiede conferma e rimuove evento e clip audio associate dalla IndexedDB locale con una transazione. Non attesta cancellazione da backup o altri dispositivi. | Test di componente e storage inclusi in `npm test`. |
-| Intensità | Scala numerica discreta 1–5, esplicitamente soggettiva; non è una misura in dB(A). | Template e modello in [src/app/domain/noise-event.model.ts](./src/app/domain/noise-event.model.ts). |
-| Persistenza locale | Eventi e audio cifrati con AES-GCM in IndexedDB; configurazione del vault in localStorage. | Ispezione di [noise-event.repository.ts](./src/app/services/noise-event.repository.ts), [local-vault.service.ts](./src/app/services/local-vault.service.ts) e [audio-clip.repository.ts](./src/app/audio/audio-clip.repository.ts). |
-| Importazione JSON | Importazione locale con validazione e limite dimensione; il template attuale seleziona la modalità additiva. | Test di importazione incluso in `npm test`. |
-| Export JSON | Esporta metadati degli eventi in chiaro; non include l’audio. | Ispezione di [src/app/app.ts](./src/app/app.ts) e documentazione README. |
-| Registrazione audio | Avvio esplicito, accesso al microfono, limite temporale e dimensionale, conservazione locale cifrata. | Ispezione di [audio-recording.service.ts](./src/app/audio/audio-recording.service.ts) e [audio-clip.repository.ts](./src/app/audio/audio-clip.repository.ts). |
-| Guide documentali | Contenuti editoriali organizzativi; non sono funzioni generate dall’app e non costituiscono consulenza. | [situations/noise/README.md](./situations/noise/README.md). |
+| Funzionalità                         | Stato ed evidenza                                                                                                                                                                                                                    | Verifica                                                                                                                                                                                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Creazione di una bozza evento        | Presente: il form raccoglie data/ora, stanza, intensità percepita e contesto. La stanza non è obbligatoria.                                                                                                                          | Test componente incluso in `npm test`.                                                                                                                                                                                                                  |
+| Consultazione, ricerca e ordinamento | Presente: lista con ricerca testuale e ordinamento per data, intensità o stanza; non è una tabella.                                                                                                                                  | Ispezione di [src/app/app.html](./src/app/app.html) e [src/app/app.ts](./src/app/app.ts).                                                                                                                                                               |
+| Modifica evento                      | Presente: richiede un motivo, salva uno snapshot precedente e mantiene la cronologia nell'evento locale cifrato.                                                                                                                     | Test componente per salvataggio, annullamento e conservazione dei valori non indicati; `npm test` superato.                                                                                                                                             |
+| Eliminazione evento                  | Presente: richiede conferma e rimuove evento e clip audio associate dalla IndexedDB locale con una transazione. Non attesta cancellazione da backup o altri dispositivi.                                                             | Test di componente e storage inclusi in `npm test`.                                                                                                                                                                                                     |
+| Intensità                            | Scala numerica discreta 1–5, esplicitamente soggettiva; non è una misura in dB(A).                                                                                                                                                   | Template e modello in [src/app/domain/noise-event.model.ts](./src/app/domain/noise-event.model.ts).                                                                                                                                                     |
+| Persistenza locale                   | Eventi e audio cifrati con AES-GCM in IndexedDB; chiave dati avvolta da password e chiave di recupero locale. Vault precedenti migrano al primo sblocco con la password corrente.                                                    | Ispezione di [noise-event.repository.ts](./src/app/services/noise-event.repository.ts), [local-vault.service.ts](./src/app/services/local-vault.service.ts) e [audio-clip.repository.ts](./src/app/audio/audio-clip.repository.ts); test da rieseguire. |
+| Recupero password                    | La chiave di recupero consente di impostare una nuova password e viene sostituita; la chiave nuova va conservata e confermata. Non esiste un reset remoto o admin.                                                                   | Test di servizio/UI da rieseguire insieme a build e validazione runtime.                                                                                                                                                                                |
+| Backup e ripristino                  | File `.ndbackup` cifrato con password inserita all'esportazione, episodi e audio; importazione additiva con gestione esplicita dei conflitti e modalità sostitutiva confermata. JSON storici in chiaro importabili solo dopo avviso. | Test di servizio/UI; completare verifica manuale del ripristino in profilo pulito.                                                                                                                                                                      |
+| Registrazione audio                  | Avvio esplicito, accesso al microfono, limite temporale e dimensionale, conservazione locale cifrata.                                                                                                                                | Ispezione di [audio-recording.service.ts](./src/app/audio/audio-recording.service.ts) e [audio-clip.repository.ts](./src/app/audio/audio-clip.repository.ts).                                                                                           |
+| Guide documentali                    | Contenuti editoriali organizzativi; non sono funzioni generate dall’app e non costituiscono consulenza.                                                                                                                              | [situations/noise/README.md](./situations/noise/README.md).                                                                                                                                                                                             |
 
 ## 4. Funzionalità parziali o mancanti
 
 - La consultazione è una lista, non la tabella richiesta.
 - La stanza è facoltativa; l’intensità ha un valore iniziale e i valori non hanno descrittori accessibili individuali.
 - L’ora locale viene convertita in UTC senza conservare il fuso orario originale.
-- Non risultano implementati planimetria, calendario, report, sincronizzazione, backup cifrato, ripristino verificato o cancellazione completa.
+- Non risultano implementati planimetria, calendario, report, sincronizzazione o cancellazione completa verificabile. Il ripristino cifrato è implementato, ma non ancora verificato manualmente su un profilo browser separato.
 - Il pannello “Analisi frequenze” dichiara che l’analisi non è disponibile; l’indicatore “Offline” è statico.
 - La correzione del binding d’importazione ha risolto l’errore di compilazione che bloccava la prima esecuzione dei test. Non è stata condotta una revisione funzionale più ampia delle modifiche preesistenti nel branch.
 
 ## 5. Build, lint e test
 
-| Comando | Esito | Problemi o note |
-|---|---|---|
-| `npm test` | Superato — 5 file, 23 test | Include test CRUD, conferma cancellazione, rimozione degli audio associati e conservazione di valori non indicati. |
-| `npm run build` | Superato | `src/app/app.scss` è 7,83 kB: supera il warning budget di 4 kB, ma resta sotto il limite di errore di 8 kB. |
-| `npm run lint` | Fallito | Prettier segnala 65 file; il comando controlla Markdown/YAML/tool, non il TypeScript. Nessun file è stato formattato automaticamente. |
-| `npm run content:check` | Fallito | `situations/README.md` non è aggiornato; è inoltre segnalato il revisore non assegnato in `situations/noise/metadata.yml`. Nessun indice è stato rigenerato. |
-| `git diff --check` | Superato | Nessun errore whitespace. |
+| Comando                 | Esito                      | Problemi o note                                                                                                                                              |
+| ----------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm test`              | Superato — 5 file, 23 test | Include test CRUD, conferma cancellazione, rimozione degli audio associati e conservazione di valori non indicati.                                           |
+| `npm run build`         | Superato                   | `src/app/app.scss` è 7,83 kB: supera il warning budget di 4 kB, ma resta sotto il limite di errore di 8 kB.                                                  |
+| `npm run lint`          | Fallito                    | Prettier segnala 65 file; il comando controlla Markdown/YAML/tool, non il TypeScript. Nessun file è stato formattato automaticamente.                        |
+| `npm run content:check` | Fallito                    | `situations/README.md` non è aggiornato; è inoltre segnalato il revisore non assegnato in `situations/noise/metadata.yml`. Nessun indice è stato rigenerato. |
+| `git diff --check`      | Superato                   | Nessun errore whitespace.                                                                                                                                    |
 
 Non esiste uno script `typecheck` separato; la compilazione Angular è inclusa nei test e nella build. Non sono stati eseguiti E2E, test mobile o verifiche automatiche di accessibilità.
 
@@ -90,14 +90,15 @@ Evidenze: [docs/CURRENT_ARCHITECTURE.md](./docs/CURRENT_ARCHITECTURE.md), [src/a
 
 ## 9. Dati e persistenza
 
-Gli eventi e i contenuti audio sono cifrati prima della scrittura in IndexedDB. La configurazione del vault locale è in localStorage; la password non viene salvata e non è recuperabile dall’app. L’export JSON è in chiaro e non contiene le registrazioni audio. Non è disponibile un backup cifrato con procedura di ripristino verificata.
+Gli eventi e i contenuti audio sono cifrati prima della scrittura in IndexedDB. La configurazione del vault locale è in localStorage; una chiave dati casuale è avvolta da chiavi derivate da password e chiave di recupero, che non vengono salvate in chiaro. La chiave di recupero consente il reset locale della password. I vault precedenti migrano al primo sblocco valido e la nuova chiave viene attivata solo dopo che l'utente ne conferma il salvataggio. Il backup `.ndbackup` è cifrato separatamente con la password fornita all'esportazione; l'importazione valida il payload e salva eventi e nuovi audio in una transazione. Il ripristino è coperto da test automatici, ma non è ancora stato provato manualmente su un profilo browser separato.
 
 ## 10. Sicurezza e privacy
 
 - I dati potenzialmente trattati localmente includono data/ora, stanza, descrizioni, note, intensità ed eventuali audio identificabili.
 - Nel codice esaminato non sono stati individuati account, backend applicativo, cookie o analytics. La verifica è limitata al sorgente letto e non certifica l’assenza di ogni possibile comunicazione.
 - La cifratura locale non protegge da codice malevolo eseguito nella pagina mentre il vault è sbloccato; il lock è manuale.
-- L’export è in chiaro; mancano backup/restore verificato e cancellazione completa.
+- I backup cifrati sono copie indipendenti e non si aggiornano; resta necessaria una conservazione sicura della password del backup e del file. La chiave di recupero è un segreto distinto che consente di impostare una nuova password per il vault.
+- La cancellazione completa verificabile del diario non è implementata.
 - La documentazione segnala un possibile dato personale nelle fixture/cronologia già pubblica; l’analisi non ha ripetuto una scansione storica.
 - Nessuna valutazione di conformità GDPR, valutazione legale o revisione crittografica è stata svolta.
 
@@ -121,7 +122,7 @@ Sono presenti label per vari controlli e alcuni messaggi con ruoli ARIA. Gli ele
 
 - **P0 — privacy:** rischio storico dichiarato nei documenti, da valutare senza riscrivere la cronologia senza autorizzazione esplicita.
 - **P1 — funzionalità:** la consultazione resta una lista anziché una tabella; modifica ed eliminazione locale sono implementate e verificate, ma non garantiscono la cancellazione da backup o altri dispositivi.
-- **P1 — continuità dati:** perdita della password o dello storage può impedire il recupero; export in chiaro e nessun restore verificato.
+- **P1 — continuità dati:** perdita della chiave di recupero e della password, o dello storage senza backup valido, può impedire il recupero; il ripristino va ancora verificato su un profilo browser separato.
 - **P2 — accessibilità:** navigazione della lista da tastiera e conformità WCAG non verificate.
 - **P2 — qualità:** lint e content check falliscono.
 - **Non verificabile:** stato live del deployment e configurazioni amministrative GitHub.
@@ -129,7 +130,7 @@ Sono presenti label per vari controlli e alcuni messaggi con ruoli ARIA. Gli ele
 ## 14. Decisioni da prendere
 
 - Confermare se l’app resterà esclusivamente personale o verrà distribuita ad altri.
-- Definire retention, timeout del vault, backup/restore e comportamento di cancellazione.
+- Definire retention, timeout del vault e comportamento verificabile di cancellazione.
 - Decidere quale fuso orario conservare e come trattare cambi di ora legale.
 - Valutare il rischio storico privacy con una procedura separata e autorizzata.
 - Confermare requisiti e limiti per una futura planimetria, che contiene dati domestici potenzialmente sensibili.
@@ -137,13 +138,13 @@ Sono presenti label per vari controlli e alcuni messaggi con ruoli ARIA. Gli ele
 
 ## 15. Roadmap proposta
 
-| Priorità | Attività e motivazione | Dipendenze | Rischio | Complessità | Criterio di accettazione | Test richiesti |
-|---|---|---|---|---|---|---|
-| P0 | Valutare il rischio di dati personali nella cronologia pubblica. | Decisione del proprietario; nessuna riscrittura senza approvazione. | Alto | M | Decisione e perimetro documentati senza esporre i dati. | Verifica autorizzata di repository/cronologia, senza riportare valori sensibili. |
-| P1 | Definire backup cifrato, ripristino e cancellazione. | Decisioni su retention e modello di recupero. | Alto | L | Ripristino verificato e limiti di cancellazione dichiarati chiaramente. | Round-trip, password errata, dati corrotti e cancellazione. |
-| P2 | Risolvere formattazione e indice editoriale in attività indipendenti. | Revisione dei contenuti e assegnazione revisore. | Basso | S | `npm run lint` e `npm run content:check` superati senza disabilitare controlli. | Eseguire i due comandi in sola verifica. |
-| P2 | Migliorare navigazione da tastiera e verifiche responsive/accessibilità. | Nessuna. | Medio | M | Flussi principali usabili da tastiera con focus evidente. | Test manuale, screen reader e axe su flussi essenziali. |
-| P3 | Valutare planimetria locale con overlay immagine/SVG e coordinate normalizzate. | Planimetria fornita e decisione privacy esplicita. | Alto | L | Nessun upload o tile esterno; posizione persistente in locale e indipendente dal ridimensionamento. | Test di resize, zoom, associazione alla stanza, persistenza e assenza di richieste esterne. |
+| Priorità | Attività e motivazione                                                                                | Dipendenze                                                          | Rischio | Complessità | Criterio di accettazione                                                                            | Test richiesti                                                                              |
+| -------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------- | ----------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| P0       | Valutare il rischio di dati personali nella cronologia pubblica.                                      | Decisione del proprietario; nessuna riscrittura senza approvazione. | Alto    | M           | Decisione e perimetro documentati senza esporre i dati.                                             | Verifica autorizzata di repository/cronologia, senza riportare valori sensibili.            |
+| P1       | Verificare il ripristino cifrato in un profilo browser separato e definire la cancellazione completa. | Decisioni su retention e modello di recupero.                       | Alto    | L           | Episodi e audio ripristinati; limiti di cancellazione dichiarati chiaramente.                       | Round-trip, password errata, dati corrotti e cancellazione.                                 |
+| P2       | Risolvere formattazione e indice editoriale in attività indipendenti.                                 | Revisione dei contenuti e assegnazione revisore.                    | Basso   | S           | `npm run lint` e `npm run content:check` superati senza disabilitare controlli.                     | Eseguire i due comandi in sola verifica.                                                    |
+| P2       | Migliorare navigazione da tastiera e verifiche responsive/accessibilità.                              | Nessuna.                                                            | Medio   | M           | Flussi principali usabili da tastiera con focus evidente.                                           | Test manuale, screen reader e axe su flussi essenziali.                                     |
+| P3       | Valutare planimetria locale con overlay immagine/SVG e coordinate normalizzate.                       | Planimetria fornita e decisione privacy esplicita.                  | Alto    | L           | Nessun upload o tile esterno; posizione persistente in locale e indipendente dal ridimensionamento. | Test di resize, zoom, associazione alla stanza, persistenza e assenza di richieste esterne. |
 
 Per la planimetria, un overlay locale su immagine/SVG con coordinate normalizzate `[0,1]` è una prima opzione proporzionata; aree delle stanze possono essere aggiunte successivamente. Leaflet `CRS.Simple` può offrire zoom e pan ma introduce dipendenza e complessità. Un PDF andrebbe elaborato localmente; planimetria e coordinate non dovrebbero essere caricate su servizi esterni o pubblicate senza autorizzazione.
 

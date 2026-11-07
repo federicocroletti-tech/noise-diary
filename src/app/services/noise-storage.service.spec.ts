@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import { AudioClip } from '../audio/models/audio-clip.model';
 import { NoiseEvent } from '../domain/noise-event.model';
 import { NoiseEventRepository } from './noise-event.repository';
 import { LocalVaultService } from './local-vault.service';
@@ -177,6 +178,40 @@ describe('NoiseStorageService', () => {
     expect(await readStoredClipIds('event-keep')).toEqual(['clip-keep']);
   });
 
+  it('atomically replaces events and audio clips when restoring a backup', async () => {
+    const storage = await createStorage();
+    const previousEvent = eventForDeletion('previous-event');
+    const restoredEvent = eventForDeletion('restored-event');
+    await storage.saveEvents([previousEvent]);
+    await putStoredAudioClip('previous-clip', previousEvent.id);
+
+    const clip: AudioClip = {
+      id: 'restored-clip',
+      eventId: restoredEvent.id,
+      kind: 'event',
+      blob: new Blob(['synthetic audio backup'], { type: 'audio/webm' }),
+      fileName: 'synthetic.webm',
+      mimeType: 'audio/webm',
+      sizeBytes: 22,
+      durationMs: 1200,
+      createdAt: '2026-10-25T00:00:00.000Z',
+      sha256: 'a'.repeat(64),
+      origin: 'microphone',
+      device: { platform: 'synthetic-test-platform' },
+    };
+
+    await storage.saveEventsAndClips([restoredEvent], [clip], true);
+
+    expect((await storage.loadEvents()).map((event) => event.id)).toEqual([restoredEvent.id]);
+    expect(await readStoredClipIds(previousEvent.id)).toEqual([]);
+    expect(await readStoredClipIds(restoredEvent.id)).toEqual([clip.id]);
+    const storedClip = await readStoredClip(clip.id);
+    expect(storedClip).toHaveProperty('id', clip.id);
+    expect(storedClip).toHaveProperty('eventId', restoredEvent.id);
+    expect(storedClip).toHaveProperty('ciphertext');
+    expect(storedClip).not.toHaveProperty('fileName');
+  });
+
   it('preserves unreadable legacy data and reports the problem', async () => {
     localStorage.setItem('noise-diary.events', '{invalid');
     const storage = await createStorage();
@@ -246,6 +281,25 @@ function readStoredClipIds(eventId: string): Promise<string[]> {
       request.onsuccess = () => {
         database.close();
         resolve(request.result as string[]);
+      };
+      request.onerror = () => {
+        database.close();
+        reject(request.error);
+      };
+    };
+  });
+}
+
+function readStoredClip(id: string): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const openRequest = indexedDB.open('noise-diary');
+    openRequest.onerror = () => reject(openRequest.error);
+    openRequest.onsuccess = () => {
+      const database = openRequest.result;
+      const request = database.transaction('audio-clips', 'readonly').objectStore('audio-clips').get(id);
+      request.onsuccess = () => {
+        database.close();
+        resolve(request.result);
       };
       request.onerror = () => {
         database.close();

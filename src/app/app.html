@@ -5,7 +5,7 @@
       <h1>{{ title() }}</h1>
     </div>
 
-    <div class="header-actions" *ngIf="authMode() === 'unlocked'">
+    <div class="header-actions" *ngIf="authMode() === 'unlocked' && !recoveryCode()">
       <button
         type="button"
         class="secondary"
@@ -14,15 +14,24 @@
       >
         {{ showForm() ? 'Nascondi modulo' : 'Nuovo episodio' }}
       </button>
-      <button type="button" class="secondary" (click)="importInput.click()">Importa storico JSON</button>
+      <button type="button" class="secondary" (click)="importInput.click()">Importa backup (aggiungi)</button>
       <input
         #importInput
         class="visually-hidden"
         type="file"
-        accept=".json,application/json"
+        accept=".ndbackup,.json,application/json"
         (change)="importDiary($event, 'append')"
       />
-      <button type="button" class="primary" (click)="downloadExport()">Esporta JSON</button>
+      <button type="button" class="secondary" (click)="replaceInput.click()">Ripristina backup</button>
+      <input
+        #replaceInput
+        class="visually-hidden"
+        type="file"
+        accept=".ndbackup,.json,application/json"
+        (change)="importDiary($event, 'replace')"
+      />
+      <button type="button" class="primary" (click)="downloadExport()">Esporta backup cifrato</button>
+      <button type="button" class="secondary" (click)="rotateRecoveryKey()">Rigenera chiave di recupero</button>
       <button type="button" class="secondary" (click)="lockDiary()">Blocca</button>
     </div>
   </header>
@@ -36,7 +45,7 @@
       <h2>Proteggi il diario locale</h2>
       <p>
         I dati e le registrazioni saranno cifrati su questo dispositivo. La password non viene inviata
-        a un server e non può essere recuperata.
+        a un server. La chiave di recupero ti permette di impostare una nuova password se la dimentichi.
       </p>
       <form class="auth-form" (submit)="$event.preventDefault(); submitVaultAccess()">
         <label>
@@ -80,6 +89,54 @@
           </label>
           <button type="submit" class="primary" [disabled]="authBusy()">Sblocca diario</button>
         </form>
+        <button
+          type="button"
+          class="secondary"
+          (click)="toggleRecoveryMode()"
+        >
+          {{ recoveryMode() ? 'Torna allo sblocco' : 'Password dimenticata? Usa la chiave di recupero' }}
+        </button>
+        <form
+          *ngIf="recoveryMode()"
+          class="auth-form"
+          (submit)="$event.preventDefault(); recoverDiary()"
+        >
+          <label>
+            <span>Chiave di recupero</span>
+            <input
+              type="text"
+              autocomplete="off"
+              autocapitalize="characters"
+              required
+              [value]="recoveryKeyInput()"
+              (input)="recoveryKeyInput.set($any($event.target).value)"
+            />
+          </label>
+          <label>
+            <span>Nuova password (almeno 12 caratteri)</span>
+            <input
+              type="password"
+              autocomplete="new-password"
+              minlength="12"
+              required
+              [value]="recoveryPassword()"
+              (input)="recoveryPassword.set($any($event.target).value)"
+            />
+          </label>
+          <label>
+            <span>Conferma nuova password</span>
+            <input
+              type="password"
+              autocomplete="new-password"
+              required
+              [value]="recoveryPasswordConfirmation()"
+              (input)="recoveryPasswordConfirmation.set($any($event.target).value)"
+            />
+          </label>
+          <button type="submit" class="primary" [disabled]="authBusy()">
+            Recupera diario e imposta nuova password
+          </button>
+        </form>
       </ng-container>
     </ng-template>
 
@@ -90,12 +147,65 @@
 
     <p *ngIf="authError()" class="storage-message" role="alert">{{ authError() }}</p>
     <p *ngIf="authMode() === 'setup'" class="privacy-note">
-      Conserva la password e crea regolarmente un’esportazione: senza password non è possibile
-      recuperare i dati cifrati.
+      Conserva password e chiave di recupero separatamente. La chiave consente di impostare una nuova
+      password, ma non viene salvata dall’app.
     </p>
   </section>
 
-  <main class="layout" *ngIf="authMode() === 'unlocked'">
+  <section
+    class="panel recovery-panel"
+    *ngIf="recoveryCode()"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="recovery-title"
+  >
+    <h2 id="recovery-title">Conserva la chiave di recupero</h2>
+    <p>
+      Questa chiave viene mostrata una sola volta. Conservala offline e separatamente dal dispositivo.
+      Chiunque la possieda può impostare una nuova password e accedere ai dati cifrati. Se la perdi,
+      il recupero non sarà possibile.
+    </p>
+    <label>
+      <span>Chiave di recupero</span>
+      <input
+        #recoveryDisplay
+        class="recovery-code"
+        type="text"
+        readonly
+        [value]="recoveryCode()"
+        (click)="recoveryDisplay.select()"
+        aria-label="Chiave di recupero del diario"
+      />
+    </label>
+    <div class="audio-file-actions">
+      <button type="button" class="secondary" (click)="recoveryDisplay.select()">
+        Seleziona chiave
+      </button>
+      <button type="button" class="secondary" (click)="downloadRecoveryKey()">
+        Scarica file della chiave
+      </button>
+    </div>
+    <label class="recovery-confirmation">
+      <input
+        type="checkbox"
+        [checked]="recoveryCodeSaved()"
+        (change)="recoveryCodeSaved.set($any($event.target).checked)"
+      />
+      <span>Ho conservato la chiave in un luogo sicuro separato</span>
+    </label>
+    <button
+      type="button"
+      class="primary"
+      [disabled]="!recoveryCodeSaved()"
+      (click)="finishRecoverySetup()"
+    >
+      Ho salvato la chiave, continua
+    </button>
+  </section>
+
+  <p class="panel import-message" *ngIf="recoveryNotice()" role="status">{{ recoveryNotice() }}</p>
+
+  <main class="layout" *ngIf="authMode() === 'unlocked' && !recoveryCode()">
     <section class="overview panel">
       <div class="stat-card">
         <span class="label">Eventi</span>
@@ -113,6 +223,38 @@
 
     <section class="panel storage-message" *ngIf="storageError()" role="alert">{{ storageError() }}</section>
     <section class="panel import-message" *ngIf="importStatus()" role="status">{{ importStatus() }}</section>
+    <section class="panel import-review" *ngIf="pendingAppendImport() as pending" aria-labelledby="import-review-title">
+      <h2 id="import-review-title">Episodi con lo stesso ID</h2>
+      <p>Le registrazioni audio vengono aggiunte senza eliminare quelle locali.</p>
+      <ul>
+        <li *ngFor="let conflict of pending.conflicts">
+          <strong>{{ conflict.current.locationLabel || 'Episodio senza luogo' }}</strong>
+          <span>{{ conflict.current.startedAt | date: 'dd MMM yyyy, HH:mm' }}</span>
+          <label>
+            <input
+              type="radio"
+              [name]="'import-conflict-' + conflict.current.id"
+              [checked]="conflict.choice === 'keep-current'"
+              (change)="resolveImportConflict(conflict.current.id, 'keep-current')"
+            />
+            Mantieni episodio locale
+          </label>
+          <label>
+            <input
+              type="radio"
+              [name]="'import-conflict-' + conflict.current.id"
+              [checked]="conflict.choice === 'use-file'"
+              (change)="resolveImportConflict(conflict.current.id, 'use-file')"
+            />
+            Usa episodio del backup
+          </label>
+        </li>
+      </ul>
+      <div class="audio-file-actions">
+        <button type="button" class="secondary" (click)="cancelAppendImport()">Annulla importazione</button>
+        <button type="button" class="primary" (click)="confirmAppendImport()">Completa importazione</button>
+      </div>
+    </section>
     <section class="panel storage-message" *ngIf="loadingEvents()" role="status">Caricamento del diario locale…</section>
 
     <section class="panel form-panel" *ngIf="showForm() && !loadingEvents()">
@@ -290,7 +432,7 @@
       </ul>
 
       <ng-template #emptyState>
-        <p class="empty-state">Nessun episodio nel diario. Crea un episodio o importa uno storico JSON; i dati restano cifrati su questo dispositivo.</p>
+        <p class="empty-state">Nessun episodio nel diario. Crea un episodio o importa un backup cifrato; i dati restano cifrati su questo dispositivo.</p>
       </ng-template>
     </section>
 

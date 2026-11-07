@@ -7,3 +7,4 @@ Le modifiche rilevanti per gli utenti sono registrate qui. Il formato segue le c
 ### Added
 
 - Caso documentale pilota per episodi di rumore, indice generato, policy editoriali e controlli pull request senza segreti.
+- Backup locale cifrato di episodi e registrazioni audio, con importazione additiva e ripristino sostitutivo confermato.
