@@ -6,12 +6,12 @@ Diario Rumore è una PWA local-first per annotare episodi di rumore domestico e 
 
 - Diario cronologico con ricerca, ordinamento e bozze.
 - Intensità percepita (scala soggettiva 1–5), contesto, note e ipotesi dichiarate come tali.
-- Password locale e cifratura AES-GCM di episodi e registrazioni nell'archivio del browser.
-- Importazione idempotente di episodi JSON ed esportazione JSON dei metadati.
+- Password locale, chiave di recupero e cifratura AES-GCM di episodi e registrazioni nell'archivio del browser.
+- Backup locale versionato, cifrato con la password richiesta all'esportazione, con episodi e registrazioni audio; importazione additiva con gestione dei conflitti.
 - Registrazioni audio esplicitamente avviate dall'utente e salvate localmente in IndexedDB.
 - Contenuti guida pilota per documentare episodi di rumore senza trasformare osservazioni o ipotesi in accertamenti.
 
-**Limiti attuali:** l'applicazione non genera fascicoli, comunicazioni o PDF; l'esportazione non include le registrazioni audio; non supporta allegati immagine, modifica o cancellazione completa dei casi. La password protegge soltanto l'archivio locale: non esistono account online, sincronizzazione o recupero password. I file JSON esportati sono in chiaro e vanno conservati privatamente.
+**Limiti attuali:** l'applicazione non genera fascicoli, comunicazioni o PDF; non supporta allegati immagine né cancellazione completa verificata del diario. Il recupero è affidato a una chiave generata localmente, non a un account online o al maintainer: senza password e chiave di recupero i dati non sono recuperabili. I backup cifrati restano copie indipendenti.
 
 ## Cosa non è
 
@@ -53,11 +53,13 @@ La sola sezione globale è [`jurisdictions/global/`](./jurisdictions/global/READ
 
 ## Creare e gestire un caso nell'app
 
-Al primo avvio, crea una password locale di almeno 12 caratteri. Scegli **Nuovo episodio** per annotare osservazioni e ipotesi; usa **Importa storico JSON** per aggiungere episodi validati senza sostituire quelli già presenti. L'importazione viene elaborata nel browser e non invia il file a un server. Gli episodi e le registrazioni vengono cifrati con AES-GCM in IndexedDB; la chiave è derivata dalla password e resta in memoria solo mentre il diario è sbloccato. **Blocca** cancella i dati decifrati dalla vista corrente. Consulta [la guida a cifratura e importazione locale](./docs/local-encrypted-import.md) prima di inserire dati reali.
+Al primo avvio, crea una password locale di almeno 12 caratteri e conserva la chiave di recupero mostrata dall'app in un luogo sicuro separato. Se dimentichi la password, dalla schermata di accesso puoi usare la chiave per impostarne una nuova; il recupero genera una chiave sostitutiva da conservare. Scegli **Nuovo episodio** per annotare osservazioni e ipotesi; usa **Esporta backup cifrato** per salvare episodi e registrazioni audio in un file `.ndbackup`. Per importarlo, inserisci la password usata per creare quel backup: il file viene decifrato e validato solo nel browser. L'importazione è additiva; gli episodi con ID in conflitto richiedono una scelta esplicita e i file audio locali non vengono eliminati. Il ripristino sostitutivo, se avviato esplicitamente, conferma la rimozione dei dati locali non presenti nel backup. **Blocca** cancella i dati decifrati dalla vista corrente. Consulta [la guida a cifratura e importazione locale](./docs/local-encrypted-import.md) prima di inserire dati reali.
 
-Non esistono account online o sincronizzazione: la password è locale e non può essere reimpostata. Un'esportazione JSON contiene dati in chiaro; i file audio non sono inclusi nell'esportazione.
+Un episodio può essere corretto indicando un motivo, conservato insieme alla versione precedente nella cronologia locale cifrata. Puoi anche eliminare un singolo episodio dopo una conferma: l'app rimuove dalla IndexedDB di questo browser l'episodio e le registrazioni audio associate. Questa eliminazione non garantisce la rimozione da backup, sincronizzazioni del profilo o altri dispositivi.
 
-La cancellazione completa dei dati non è ancora implementata. La cancellazione dei dati del browser o la disinstallazione non è una procedura affidabile di cancellazione verificata. Non inserire dati che non desideri conservare sul dispositivo; usa un'esportazione privata per avere una copia recuperabile.
+Non esistono account online, sincronizzazione o pannello Keycloak. Il recupero locale tramite chiave consente di impostare una nuova password senza perdere i dati, ma non offre accesso amministrativo al maintainer. Proteggi la chiave di recupero e il backup: senza password né chiave non è possibile decifrare il diario. Un backup esportato non si aggiorna quando il diario cambia.
+
+La cancellazione completa verificata del diario non è implementata. La cancellazione dei dati del browser o la disinstallazione non è una procedura affidabile di cancellazione verificata. Non inserire dati che non desideri conservare sul dispositivo; usa un'esportazione privata per avere una copia recuperabile.
 
 La generazione di lettere, PDF, ZIP o fascicoli non è attualmente disponibile nell'app. I modelli in `situations/noise/documents/` sono documenti di testo da copiare, verificare e personalizzare separatamente; l'indice editoriale viene rigenerato con `npm run content:check -- --write-index`.
 

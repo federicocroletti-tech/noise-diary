@@ -48,6 +48,7 @@ describe('AudioClipRepository', () => {
     expect(stored).not.toHaveProperty('blob');
 
     expect(await repository.listByEvent(clip.eventId)).toEqual([clip]);
+    expect(await repository.getByIds([clip.id])).toEqual([clip]);
 
     vault.lock();
     await expect(repository.listByEvent(clip.eventId)).rejects.toThrow('Sblocca il diario');

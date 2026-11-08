@@ -13,18 +13,63 @@ import {
   CONTINUITY_TYPES,
   EVENT_STATUSES,
   NoiseEvent,
+  NoiseEventCorrection,
   NoiseEventDraft,
   NoiseEventType,
   PerceivedEffect,
   PERCEIVED_EFFECTS,
 } from './domain/noise-event.model';
+import { LocalBackupService } from './services/local-backup.service';
 
 type SortMode = 'recent' | 'intensity' | 'room';
+type DiaryView = 'list' | 'form' | 'detail';
+type ImportChoice = 'keep-current' | 'use-file';
+const MAX_BACKUP_FILE_SIZE = 120 * 1024 * 1024;
+
+interface ImportConflict {
+  current: NoiseEvent;
+  incoming: NoiseEvent;
+  choice: ImportChoice;
+}
+
+interface PendingAppendImport {
+  additions: NoiseEvent[];
+  conflicts: ImportConflict[];
+  duplicateCount: number;
+  audioClips: AudioClip[];
+}
 
 function currentLocalDateTime(): string {
   const date = new Date();
   date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
   return date.toISOString().slice(0, 16);
+}
+
+function toLocalDateTime(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return currentLocalDateTime();
+  }
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+
+function normalizeJson(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeJson(item));
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([first], [second]) => first.localeCompare(second))
+        .map(([key, item]) => [key, normalizeJson(item)]),
+    );
+  }
+  return value;
+}
+
+function sameEvent(first: NoiseEvent, second: NoiseEvent): boolean {
+  return JSON.stringify(normalizeJson(first)) === JSON.stringify(normalizeJson(second));
 }
 
 const EMPTY_DRAFT: NoiseEventDraft = {
@@ -60,9 +105,22 @@ export class App implements OnDestroy {
   );
   protected readonly passwordInput = signal('');
   protected readonly passwordConfirmation = signal('');
+  protected readonly recoveryKeyInput = signal('');
+  protected readonly recoveryPassword = signal('');
+  protected readonly recoveryPasswordConfirmation = signal('');
+  protected readonly recoveryMode = signal(false);
+  protected readonly recoveryCode = signal('');
+  protected readonly recoveryCodeSaved = signal(false);
+  protected readonly recoveryNotice = signal('');
   protected readonly authError = signal('');
   protected readonly authBusy = signal(false);
   protected readonly showForm = signal(true);
+  protected readonly activeView = signal<DiaryView>('list');
+  protected readonly editingEventId = signal<string | null>(null);
+  protected readonly correctionReason = signal('');
+  protected readonly intensityUnreported = signal(false);
+  protected readonly effectsUnreported = signal(false);
+  protected readonly pendingAppendImport = signal<PendingAppendImport | null>(null);
   protected readonly loadingEvents = signal(true);
   protected readonly storageError = signal('');
   protected readonly search = signal('');
@@ -127,7 +185,7 @@ export class App implements OnDestroy {
 
   protected readonly selectedEvent = computed(() => {
     const selectedId = this.selectedEventId();
-    return this.events().find((event) => event.id === selectedId) ?? this.filteredEvents()[0] ?? null;
+    return this.events().find((event) => event.id === selectedId) ?? null;
   });
 
   protected readonly eventTypeOptions: readonly NoiseEventType[] = [
@@ -167,6 +225,7 @@ export class App implements OnDestroy {
     draft: 'Bozza',
     complete: 'Completo',
     'to-review': 'Da verificare',
+    corrected: 'Corretto',
     exported: 'Esportato',
     archived: 'Archiviato',
     awakening: 'Risveglio',
@@ -183,6 +242,7 @@ export class App implements OnDestroy {
     private readonly audioRecordingService: AudioRecordingService,
     private readonly audioClipRepository: AudioClipRepository,
     private readonly vault: LocalVaultService,
+    private readonly backupService: LocalBackupService,
   ) {
     void this.initialize();
   }
@@ -212,14 +272,18 @@ export class App implements OnDestroy {
 
     this.authBusy.set(true);
     try {
+      let generatedRecoveryKey: string | null;
       if (mode === 'setup') {
-        await this.vault.create(password);
+        generatedRecoveryKey = await this.vault.create(password);
         this.authMode.set('locked');
       } else {
-        await this.vault.unlock(password);
+        generatedRecoveryKey = await this.vault.unlock(password);
       }
       await this.loadPrivateDiary();
       this.authMode.set('unlocked');
+      if (generatedRecoveryKey) {
+        this.presentRecoveryKey(generatedRecoveryKey);
+      }
       this.passwordInput.set('');
       this.passwordConfirmation.set('');
       this.authError.set('');
@@ -234,6 +298,105 @@ export class App implements OnDestroy {
     } finally {
       this.authBusy.set(false);
     }
+  }
+
+  protected async recoverDiary(): Promise<void> {
+    this.authError.set('');
+    const newPassword = this.recoveryPassword();
+    if (newPassword.length < 12) {
+      this.authError.set('La nuova password deve contenere almeno 12 caratteri.');
+      return;
+    }
+    if (newPassword !== this.recoveryPasswordConfirmation()) {
+      this.authError.set('Le nuove password non coincidono.');
+      return;
+    }
+
+    this.authBusy.set(true);
+    try {
+      const newRecoveryKey = await this.vault.recover(this.recoveryKeyInput(), newPassword);
+      await this.loadPrivateDiary();
+      this.authMode.set('unlocked');
+      this.recoveryMode.set(false);
+      this.recoveryKeyInput.set('');
+      this.recoveryPassword.set('');
+      this.recoveryPasswordConfirmation.set('');
+      this.presentRecoveryKey(newRecoveryKey);
+      this.authError.set('');
+    } catch (error) {
+      this.vault.lock();
+      this.clearPrivateDiary();
+      this.authError.set(
+        error instanceof Error ? error.message : 'Impossibile recuperare il diario locale.',
+      );
+    } finally {
+      this.authBusy.set(false);
+    }
+  }
+
+  protected toggleRecoveryMode(): void {
+    this.recoveryMode.update((value) => !value);
+    this.authError.set('');
+  }
+
+  protected finishRecoverySetup(): void {
+    if (!this.recoveryCodeSaved()) {
+      return;
+    }
+    try {
+      this.vault.commitRecoveryChange();
+      this.recoveryCode.set('');
+      this.recoveryCodeSaved.set(false);
+      this.recoveryNotice.set('Chiave di recupero salvata e attivata.');
+    } catch (error) {
+      this.storageError.set(
+        error instanceof Error ? error.message : 'Impossibile attivare il recupero del diario.',
+      );
+    }
+  }
+
+  protected async rotateRecoveryKey(): Promise<void> {
+    if (
+      !window.confirm(
+        'Rigenerare la chiave di recupero? Quella precedente smetterà di funzionare quando confermerai la nuova chiave.',
+      )
+    ) {
+      return;
+    }
+    try {
+      const recoveryKey = await this.vault.rotateRecoveryKey();
+      this.presentRecoveryKey(recoveryKey);
+      this.recoveryNotice.set('');
+    } catch (error) {
+      this.storageError.set(
+        error instanceof Error ? error.message : 'Impossibile rigenerare la chiave di recupero.',
+      );
+    }
+  }
+
+  protected downloadRecoveryKey(): void {
+    const recoveryKey = this.recoveryCode();
+    if (!recoveryKey) {
+      return;
+    }
+    const blob = new Blob(
+      [
+        `Diario Rumore - chiave di recupero\n\n${recoveryKey}\n\nConserva questo file separatamente dal dispositivo e dalla password principale. Chiunque abbia questa chiave può impostare una nuova password per il diario.\n`,
+      ],
+      { type: 'text/plain;charset=utf-8' },
+    );
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'diario-rumore-chiave-recupero.txt';
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  private presentRecoveryKey(recoveryKey: string): void {
+    this.recoveryCode.set(recoveryKey);
+    this.recoveryCodeSaved.set(false);
+    this.recoveryNotice.set('');
   }
 
   protected lockDiary(): void {
@@ -253,10 +416,10 @@ export class App implements OnDestroy {
     this.importStatus.set('');
   }
 
-  protected async importDiary(event: Event): Promise<void> {
+  protected async importDiary(event: Event, mode: 'replace' | 'append'): Promise<void> {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) {
-      this.storageError.set('Seleziona un file JSON valido da importare.');
+      this.storageError.set('Seleziona un backup Diario Rumore valido da importare.');
       return;
     }
     const file = input.files?.[0];
@@ -264,41 +427,95 @@ export class App implements OnDestroy {
     if (!file) {
       return;
     }
-    if (!file.name.toLowerCase().endsWith('.json')) {
-      this.storageError.set('Seleziona un file con estensione .json.');
+    if (!/\.(?:json|ndbackup)$/i.test(file.name)) {
+      this.storageError.set('Seleziona un file .ndbackup o un JSON storico.');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      this.storageError.set('Il file supera il limite di 5 MB.');
+    if (file.size > MAX_BACKUP_FILE_SIZE) {
+      this.storageError.set('Il backup supera il limite di 120 MiB.');
       return;
     }
 
     this.storageError.set('');
     this.importStatus.set('');
     try {
-      const importedEvents = this.storageService.parseImport(
-        JSON.parse(await file.text()) as unknown,
-      );
-      const existingIds = new Set(this.events().map((item) => item.id));
-      const newEvents = importedEvents.filter((item) => !existingIds.has(item.id));
-      if (newEvents.length === 0) {
-        this.importStatus.set('Tutti gli episodi del file sono già presenti nel diario.');
+      const contents: unknown = JSON.parse(await file.text());
+      let importedEvents: NoiseEvent[];
+      let importedClips: AudioClip[] = [];
+      if (this.backupService.isEncryptedEnvelope(contents)) {
+        const password = window.prompt(
+          'Inserisci la password principale usata per cifrare questo backup.',
+        );
+        if (password === null) {
+          this.importStatus.set('Importazione annullata; nessun episodio è stato modificato.');
+          return;
+        }
+        const backup = await this.backupService.decrypt(contents, password);
+        importedEvents = backup.events.length
+          ? this.storageService.parseImport(backup.events)
+          : [];
+        importedClips = backup.audioClips;
+      } else {
+        if (
+          !window.confirm(
+            'Questo JSON storico non è cifrato e non contiene registrazioni audio. Importarlo solo se proviene da una fonte attendibile?',
+          )
+        ) {
+          this.importStatus.set('Importazione annullata; nessun episodio è stato modificato.');
+          return;
+        }
+        importedEvents = this.storageService.parseImport(contents);
+      }
+
+      if (mode === 'replace') {
+        if (
+          !confirm(
+            'Sostituire tutti gli episodi e le registrazioni locali con quelli del backup? Le registrazioni locali non presenti nel backup verranno eliminate.',
+          )
+        ) {
+          return;
+        }
+        await this.storageService.saveEventsAndClips(importedEvents, importedClips, true);
+        this.events.set(importedEvents);
+        this.selectedEventId.set(importedEvents[0]?.id ?? null);
+        this.activeView.set('list');
+        this.revokeAudioUrls();
+        this.audioClips.set([]);
+        if (importedEvents[0]) {
+          await this.loadAudioForEvent(importedEvents[0].id);
+        }
+        this.importStatus.set(
+          `Sostituiti gli episodi con ${importedEvents.length} elementi e importate ${importedClips.length} registrazioni audio dal backup.`,
+        );
         return;
       }
 
-      const mergedEvents = [...this.events(), ...newEvents];
-      await this.storageService.saveEvents(mergedEvents);
-      this.events.set(mergedEvents);
-      this.selectedEventId.set(newEvents[0].id);
-      await this.loadAudioForEvent(newEvents[0].id);
-      const importedMessage =
-        newEvents.length === 1 ? 'Importato 1 episodio' : `Importati ${newEvents.length} episodi`;
-      const duplicateCount = importedEvents.length - newEvents.length;
-      const duplicateMessage =
-        duplicateCount === 1 ? '1 duplicato ignorato' : `${duplicateCount} duplicati ignorati`;
-      this.importStatus.set(
-        `${importedMessage}; ${duplicateMessage}. Il file sorgente resta in chiaro sul dispositivo; eliminalo se non ti serve più.`,
-      );
+      if (importedEvents.length === 0) {
+        this.importStatus.set('Il backup non contiene episodi; nessun dato è stato modificato.');
+        return;
+      }
+
+      const currentById = new Map(this.events().map((item) => [item.id, item]));
+      const additions: NoiseEvent[] = [];
+      const conflicts: ImportConflict[] = [];
+      let duplicateCount = 0;
+      for (const incoming of importedEvents) {
+        const current = currentById.get(incoming.id);
+        if (!current) {
+          additions.push(incoming);
+        } else if (sameEvent(current, incoming)) {
+          duplicateCount += 1;
+        } else {
+          conflicts.push({ current, incoming, choice: 'keep-current' });
+        }
+      }
+
+      if (conflicts.length > 0) {
+        this.pendingAppendImport.set({ additions, conflicts, duplicateCount, audioClips: importedClips });
+        this.importStatus.set('Rivedi gli episodi con lo stesso ID prima di completare l’importazione.');
+        return;
+      }
+      await this.applyAppendImport(additions, [], duplicateCount, importedClips);
     } catch (error) {
       this.storageError.set(
         error instanceof Error ? error.message : 'Impossibile importare il file selezionato.',
@@ -306,12 +523,215 @@ export class App implements OnDestroy {
     }
   }
 
+  protected resolveImportConflict(eventId: string, choice: ImportChoice): void {
+    this.pendingAppendImport.update((pending) =>
+      pending
+        ? {
+            ...pending,
+            conflicts: pending.conflicts.map((conflict) =>
+              conflict.current.id === eventId ? { ...conflict, choice } : conflict,
+            ),
+          }
+        : null,
+    );
+  }
+
+  protected cancelAppendImport(): void {
+    this.pendingAppendImport.set(null);
+    this.importStatus.set('Importazione annullata; nessun episodio è stato modificato.');
+  }
+
+  protected async confirmAppendImport(): Promise<void> {
+    const pending = this.pendingAppendImport();
+    if (!pending) {
+      return;
+    }
+    try {
+      await this.applyAppendImport(
+        pending.additions,
+        pending.conflicts,
+        pending.duplicateCount,
+        pending.audioClips,
+      );
+      this.pendingAppendImport.set(null);
+    } catch (error) {
+      this.storageError.set(
+        error instanceof Error ? error.message : 'Impossibile completare l’importazione.',
+      );
+    }
+  }
+
+  private async applyAppendImport(
+    additions: NoiseEvent[],
+    conflicts: ImportConflict[],
+    duplicateCount: number,
+    audioClips: AudioClip[],
+  ): Promise<void> {
+    const mergedById = new Map(this.events().map((item) => [item.id, item]));
+    for (const addition of additions) {
+      mergedById.set(addition.id, addition);
+    }
+    for (const conflict of conflicts) {
+      if (conflict.choice === 'use-file') {
+        mergedById.set(conflict.incoming.id, conflict.incoming);
+      }
+    }
+    const mergedEvents = [...mergedById.values()];
+    const retainedEventIds = new Set(
+      conflicts.filter((conflict) => conflict.choice === 'keep-current').map((conflict) => conflict.current.id),
+    );
+    const acceptedClips = audioClips.filter((clip) => !retainedEventIds.has(clip.eventId));
+    const existingClips = await this.audioClipRepository.getByIds(
+      acceptedClips.map((clip) => clip.id),
+    );
+    const existingById = new Map(existingClips.map((clip) => [clip.id, clip]));
+    const clipsToSave: AudioClip[] = [];
+    for (const clip of acceptedClips) {
+      const existing = existingById.get(clip.id);
+      if (!existing) {
+        clipsToSave.push(clip);
+      } else if (
+        existing.eventId !== clip.eventId ||
+        existing.sha256 !== clip.sha256 ||
+        existing.sizeBytes !== clip.sizeBytes
+      ) {
+        throw new Error(
+          `La registrazione "${clip.fileName}" ha un ID già usato per contenuti diversi; nessun dato è stato importato.`,
+        );
+      }
+    }
+    if (clipsToSave.length > 0) {
+      await this.storageService.saveEventsAndClips(mergedEvents, clipsToSave);
+    } else {
+      await this.storageService.saveEvents(mergedEvents);
+    }
+    this.events.set(mergedEvents);
+    const importedCount = additions.length + conflicts.filter((item) => item.choice === 'use-file').length;
+    const nextSelectedId =
+      additions[0]?.id ??
+      conflicts.find((item) => item.choice === 'use-file')?.incoming.id ??
+      clipsToSave[0]?.eventId;
+    if (nextSelectedId) {
+      this.selectedEventId.set(nextSelectedId);
+      await this.loadAudioForEvent(nextSelectedId);
+    }
+    this.activeView.set('list');
+    const duplicateSummary = duplicateCount + conflicts.filter((item) => item.choice === 'keep-current').length;
+    const importedMessage =
+      importedCount === 1
+        ? 'Aggiunto o aggiornato 1 episodio'
+        : `Aggiunti o aggiornati ${importedCount} episodi`;
+    const retainedMessage =
+      duplicateSummary === 1
+        ? 'mantenuto 1 elemento locale non sostituito'
+        : `mantenuti ${duplicateSummary} elementi locali non sostituiti`;
+    this.importStatus.set(
+      `${importedMessage}; ${retainedMessage}; importate ${clipsToSave.length} registrazioni audio.`,
+    );
+  }
+
   protected toggleForm(): void {
+    if (this.editingEventId()) {
+      return;
+    }
     this.showForm.update((value) => !value);
+  }
+
+  protected beginEdit(event: NoiseEvent): void {
+    if (this.recordingActive()) {
+      this.storageError.set('Ferma la registrazione prima di modificare un episodio.');
+      return;
+    }
+
+    this.editingEventId.set(event.id);
+    this.correctionReason.set('');
+    this.intensityUnreported.set(event.perceivedIntensity === null);
+    this.effectsUnreported.set(event.perceivedEffects.length === 0);
+    this.selectedEventId.set(event.id);
+    this.draft.set({
+      locationLabel: event.locationLabel,
+      room: event.room,
+      eventType: event.eventType,
+      continuityType: event.continuityType,
+      perceivedIntensity: event.perceivedIntensity ?? 3,
+      suspectedSource: event.suspectedSource.replace(/\s*\(ipotesi\)\s*$/i, ''),
+      description: event.description,
+      notes: event.notes,
+      tags: event.tags.join(', '),
+      perceivedEffects: event.perceivedEffects[0] ?? 'simple-observation',
+      startedAt: toLocalDateTime(event.startedAt),
+      durationMinutes: event.duration === undefined ? null : event.duration / 60,
+      status: event.status,
+      windowsState: event.windowsState ?? '',
+      doorsState: event.doorsState ?? '',
+      microphonePosition: event.microphonePosition ?? '',
+    });
+    this.showForm.set(true);
+    this.storageError.set('');
+  }
+
+  protected cancelEdit(): void {
+    if (!this.editingEventId()) {
+      return;
+    }
+    this.editingEventId.set(null);
+    this.correctionReason.set('');
+    this.intensityUnreported.set(false);
+    this.effectsUnreported.set(false);
+    this.draft.set({ ...EMPTY_DRAFT, startedAt: currentLocalDateTime() });
+    this.showForm.set(false);
+    this.storageError.set('');
+  }
+
+  protected async deleteEvent(event: NoiseEvent): Promise<void> {
+    if (this.recordingActive()) {
+      this.storageError.set('Ferma la registrazione prima di eliminare un episodio.');
+      return;
+    }
+    if (
+      !confirm(
+        'Eliminare definitivamente questo episodio e tutte le registrazioni audio associate da questo browser? Questa operazione non garantisce la cancellazione da backup, sincronizzazioni del profilo o altri dispositivi.',
+      )
+    ) {
+      return;
+    }
+
+    this.storageError.set('');
+    try {
+      await this.storageService.deleteEvent(event.id);
+      const updatedEvents = this.events().filter((item) => item.id !== event.id);
+      this.events.set(updatedEvents);
+      this.importStatus.set(
+        'Episodio e registrazioni associate eliminati dall’archivio di questo browser.',
+      );
+      if (this.selectedEventId() === event.id) {
+        this.revokeAudioUrls();
+        this.audioClips.set([]);
+        const nextEvent = [...updatedEvents].sort(
+          (first, second) =>
+            new Date(second.startedAt).getTime() - new Date(first.startedAt).getTime(),
+        )[0];
+        this.selectedEventId.set(nextEvent?.id ?? null);
+        if (nextEvent) {
+          await this.loadAudioForEvent(nextEvent.id);
+        }
+      }
+    } catch (error) {
+      this.storageError.set(
+        error instanceof Error ? error.message : 'Impossibile eliminare l’episodio dal dispositivo.',
+      );
+    }
   }
 
   protected labelFor(value: string): string {
     return this.choiceLabels[value] ?? value;
+  }
+
+  protected onEventItemKeydown(event: KeyboardEvent, eventId: string): void {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      this.selectEvent(eventId);
+    }
   }
 
   protected onFieldChange<K extends keyof NoiseEventDraft>(field: K, value: NoiseEventDraft[K]): void {
@@ -320,6 +740,26 @@ export class App implements OnDestroy {
 
   protected async submitDraft(): Promise<void> {
     const draft = this.draft();
+    const editingId = this.editingEventId();
+    const existingEvent = editingId
+      ? this.events().find((event) => event.id === editingId)
+      : undefined;
+    if (editingId && !existingEvent) {
+      this.storageError.set('L’episodio da modificare non è più disponibile.');
+      return;
+    }
+    const reason = this.correctionReason().trim();
+    if (editingId && !reason) {
+      this.storageError.set('Indica il motivo della modifica prima di salvare la correzione.');
+      return;
+    }
+    if (
+      draft.durationMinutes !== null &&
+      (!Number.isFinite(draft.durationMinutes) || draft.durationMinutes <= 0)
+    ) {
+      this.storageError.set('La durata deve essere un numero di minuti maggiore di zero.');
+      return;
+    }
     const startedAtDate = new Date(draft.startedAt);
     if (!Number.isFinite(startedAtDate.getTime())) {
       this.storageError.set('Inserisci una data e un’ora di inizio valide.');
@@ -335,43 +775,95 @@ export class App implements OnDestroy {
     const endedAt = durationSeconds
       ? new Date(startedAtDate.getTime() + durationSeconds * 1000).toISOString()
       : undefined;
-    const event: NoiseEvent = {
-      id: `evt-${crypto.randomUUID()}`,
-      startedAt,
-      endedAt,
-      duration: durationSeconds,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      locationLabel: draft.locationLabel.trim(),
-      room: draft.room.trim(),
-      microphonePosition: draft.microphonePosition.trim() || undefined,
-      windowsState: draft.windowsState.trim() || undefined,
-      doorsState: draft.doorsState.trim() || undefined,
-      eventType: draft.eventType,
-      continuityType: draft.continuityType,
-      perceivedIntensity: draft.perceivedIntensity,
-      perceivedEffects: [draft.perceivedEffects],
-      suspectedSource: draft.suspectedSource.trim()
-        ? `${draft.suspectedSource.trim()} (ipotesi)`
-        : 'Non specificata (ipotesi)',
-      description: draft.description.trim(),
-      notes: draft.notes.trim(),
-      status: draft.status,
-      tags: draft.tags
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-      attachmentIds: [],
-    };
+    let event: NoiseEvent;
+    let events: NoiseEvent[];
+    if (existingEvent) {
+      const { correctionHistory: _correctionHistory, ...previousSnapshot } = existingEvent;
+      const correction: NoiseEventCorrection = {
+        changedAt: timestamp,
+        reason,
+        previousSnapshot: JSON.stringify(previousSnapshot),
+      };
+      event = {
+        ...existingEvent,
+        startedAt,
+        endedAt,
+        duration: durationSeconds,
+        updatedAt: timestamp,
+        locationLabel: draft.locationLabel.trim(),
+        room: draft.room.trim(),
+        windowsState: draft.windowsState.trim() || undefined,
+        doorsState: draft.doorsState.trim() || undefined,
+        eventType: draft.eventType,
+        continuityType: draft.continuityType,
+        perceivedIntensity: this.intensityUnreported() ? null : draft.perceivedIntensity,
+        perceivedEffects: this.effectsUnreported()
+          ? existingEvent.perceivedEffects
+          : [
+              draft.perceivedEffects,
+              ...existingEvent.perceivedEffects
+                .slice(1)
+                .filter((effect) => effect !== draft.perceivedEffects),
+            ],
+        suspectedSource: draft.suspectedSource.trim()
+          ? `${draft.suspectedSource.trim()} (ipotesi)`
+          : 'Non specificata (ipotesi)',
+        description: draft.description.trim(),
+        notes: draft.notes.trim(),
+        status: draft.status,
+        tags: draft.tags
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        correctionHistory: [...(existingEvent.correctionHistory ?? []), correction],
+      };
+      events = this.events().map((item) => (item.id === event.id ? event : item));
+    } else {
+      event = {
+        id: `evt-${crypto.randomUUID()}`,
+        startedAt,
+        endedAt,
+        duration: durationSeconds,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        locationLabel: draft.locationLabel.trim(),
+        room: draft.room.trim(),
+        microphonePosition: draft.microphonePosition.trim() || undefined,
+        windowsState: draft.windowsState.trim() || undefined,
+        doorsState: draft.doorsState.trim() || undefined,
+        eventType: draft.eventType,
+        continuityType: draft.continuityType,
+        perceivedIntensity: draft.perceivedIntensity,
+        perceivedEffects: [draft.perceivedEffects],
+        suspectedSource: draft.suspectedSource.trim()
+          ? `${draft.suspectedSource.trim()} (ipotesi)`
+          : 'Non specificata (ipotesi)',
+        description: draft.description.trim(),
+        notes: draft.notes.trim(),
+        status: draft.status,
+        tags: draft.tags
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        attachmentIds: [],
+      };
+      events = [event, ...this.events()];
+    }
 
-    const events = [event, ...this.events()];
     try {
       await this.storageService.saveEvents(events);
       this.events.set(events);
       this.selectedEventId.set(event.id);
       this.draft.set({ ...EMPTY_DRAFT, startedAt: currentLocalDateTime() });
+      this.editingEventId.set(null);
+      this.correctionReason.set('');
+      this.intensityUnreported.set(false);
+      this.effectsUnreported.set(false);
       this.showForm.set(false);
       this.storageError.set('');
+      this.importStatus.set(
+        existingEvent ? 'Correzione salvata con il motivo e la versione precedente.' : '',
+      );
       await this.loadAudioForEvent(event.id);
     } catch (error) {
       this.storageError.set(
@@ -509,23 +1001,42 @@ export class App implements OnDestroy {
       .padStart(2, '0')}:${(totalSeconds % 60).toString().padStart(2, '0')}`;
   }
 
-  protected downloadExport(): void {
+  protected async downloadExport(): Promise<void> {
     if (this.authMode() !== 'unlocked') {
       return;
     }
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      source: 'Diario Rumore',
-      events: this.events(),
-    };
-
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'diario-rumore-export.json';
-    anchor.click();
-    URL.revokeObjectURL(url);
+    const password = window.prompt('Inserisci la password principale per cifrare il backup.');
+    if (password === null) {
+      return;
+    }
+    this.storageError.set('');
+    try {
+      const audioClips = (
+        await Promise.all(
+          this.events().map((diaryEvent) =>
+            this.audioClipRepository.listByEvent(diaryEvent.id),
+          ),
+        )
+      ).flat();
+      const serialized = await this.backupService.encrypt(this.events(), audioClips, password);
+      const blob = new Blob([serialized], { type: 'application/json' });
+      if (blob.size > MAX_BACKUP_FILE_SIZE) {
+        throw new Error('Il backup supera il limite di 120 MiB e non può essere esportato in un unico file.');
+      }
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'diario-rumore-backup.ndbackup';
+      anchor.click();
+      URL.revokeObjectURL(url);
+      this.importStatus.set(
+        `Backup cifrato creato con ${this.events().length} episodi e ${audioClips.length} registrazioni audio.`,
+      );
+    } catch (error) {
+      this.storageError.set(
+        error instanceof Error ? error.message : 'Impossibile creare il backup cifrato.',
+      );
+    }
   }
 
   private async initialize(): Promise<void> {
@@ -560,6 +1071,22 @@ export class App implements OnDestroy {
     this.events.set([]);
     this.audioClips.set([]);
     this.selectedEventId.set(null);
+    this.editingEventId.set(null);
+    this.correctionReason.set('');
+    this.intensityUnreported.set(false);
+    this.effectsUnreported.set(false);
+    this.draft.set({ ...EMPTY_DRAFT, startedAt: currentLocalDateTime() });
+    this.showForm.set(true);
+    this.pendingAppendImport.set(null);
+    this.recoveryCode.set('');
+    this.recoveryCodeSaved.set(false);
+    this.recoveryNotice.set('');
+    this.recoveryMode.set(false);
+    this.recoveryKeyInput.set('');
+    this.recoveryPassword.set('');
+    this.recoveryPasswordConfirmation.set('');
+    this.importStatus.set('');
+    this.storageError.set('');
     this.loadingEvents.set(false);
   }
 

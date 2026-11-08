@@ -8,6 +8,7 @@ import {
   PerceivedEffect,
   PERCEIVED_EFFECTS,
 } from '../domain/noise-event.model';
+import { AudioClip } from '../audio/models/audio-clip.model';
 import { NoiseEventRepository } from './noise-event.repository';
 
 const LEGACY_STORAGE_KEY = 'noise-diary.events';
@@ -56,6 +57,24 @@ export class NoiseStorageService {
       throw new Error('Il diario contiene ID episodio duplicati; i dati non sono stati modificati.');
     }
     await this.repository.saveAll(events);
+  }
+
+  async saveEventsAndClips(
+    events: NoiseEvent[],
+    clips: AudioClip[],
+    replaceAudio = false,
+  ): Promise<void> {
+    for (const event of events) {
+      this.validateEvent(event);
+    }
+    if (new Set(events.map((event) => event.id)).size !== events.length) {
+      throw new Error('Il diario contiene ID episodio duplicati; i dati non sono stati modificati.');
+    }
+    await this.repository.saveAllWithAudio(events, clips, replaceAudio);
+  }
+
+  async deleteEvent(eventId: string): Promise<void> {
+    await this.repository.deleteEventAndAudio(eventId);
   }
 
   parseImport(value: unknown): NoiseEvent[] {

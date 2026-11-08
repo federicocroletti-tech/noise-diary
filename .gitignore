@@ -34,6 +34,7 @@ yarn-error.log
 .sass-cache/
 /connect.lock
 /coverage
+/.tsupgrader/runtime-validation/
 /libpeerconnection.log
 testem.log
 /typings
