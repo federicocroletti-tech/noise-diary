@@ -11,7 +11,7 @@ Diario Rumore è una PWA local-first per annotare episodi di rumore domestico e 
 - Registrazioni audio esplicitamente avviate dall'utente e salvate localmente in IndexedDB.
 - Contenuti guida pilota per documentare episodi di rumore senza trasformare osservazioni o ipotesi in accertamenti.
 
-**Limiti attuali:** l'applicazione non genera fascicoli, comunicazioni o PDF; non supporta allegati immagine né cancellazione completa verificata del diario. Il recupero è affidato a una chiave generata localmente, non a un account online o al maintainer: senza password e chiave di recupero i dati non sono recuperabili. I backup cifrati restano copie indipendenti.
+**Limiti attuali:** l'applicazione non genera fascicoli, comunicazioni o PDF e non supporta allegati immagine. La cancellazione completa rimuove i dati gestiti dall'app nell'origine del browser corrente, ma non è una cancellazione sicura dei supporti e non elimina backup esportati, file scaricati o copie/sincronizzazioni del profilo browser. Il recupero è affidato a una chiave generata localmente, non a un account online o al maintainer: senza password e chiave di recupero i dati non sono recuperabili. I backup cifrati restano copie indipendenti.
 
 ## Cosa non è
 
@@ -59,7 +59,7 @@ Un episodio può essere corretto indicando un motivo, conservato insieme alla ve
 
 Non esistono account online, sincronizzazione o pannello Keycloak. Il recupero locale tramite chiave consente di impostare una nuova password senza perdere i dati, ma non offre accesso amministrativo al maintainer. Proteggi la chiave di recupero e il backup: senza password né chiave non è possibile decifrare il diario. Un backup esportato non si aggiorna quando il diario cambia.
 
-La cancellazione completa verificata del diario non è implementata. La cancellazione dei dati del browser o la disinstallazione non è una procedura affidabile di cancellazione verificata. Non inserire dati che non desideri conservare sul dispositivo; usa un'esportazione privata per avere una copia recuperabile.
+Per rimuovere i dati gestiti dall'app su questo browser, sblocca il diario, chiudi le altre schede dell'app e scegli **Elimina diario locale**. Digita `ELIMINA` per confermare. L'app chiude e rimuove l'archivio IndexedDB (episodi e audio), i vecchi dati locali e la configurazione della chiave; la schermata torna alla configurazione iniziale. Il flusso è stato verificato localmente end-to-end con un episodio e una registrazione sintetici, ripristinati da backup cifrato in un'origine browser pulita. L'operazione non elimina copie esportate, file recuperati/scaricati, altri profili o dispositivi, né garantisce la sovrascrittura fisica dei supporti; i browser possono conservare backup o copie sincronizzate. Salva prima un backup cifrato se vuoi mantenere una copia recuperabile.
 
 La generazione di lettere, PDF, ZIP o fascicoli non è attualmente disponibile nell'app. I modelli in `situations/noise/documents/` sono documenti di testo da copiare, verificare e personalizzare separatamente; l'indice editoriale viene rigenerato con `npm run content:check -- --write-index`.
 

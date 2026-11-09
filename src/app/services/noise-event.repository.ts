@@ -139,6 +139,17 @@ export class NoiseEventRepository {
     this.databasePromise = undefined;
   }
 
+  async deleteDatabase(onBlocked?: () => void): Promise<void> {
+    this.close();
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.deleteDatabase(DATABASE_NAME);
+      request.onsuccess = () => resolve();
+      request.onerror = () =>
+        reject(request.error ?? new Error('Impossibile cancellare i dati locali del diario.'));
+      request.onblocked = () => onBlocked?.();
+    });
+  }
+
   private isEncryptedEvent(value: unknown): value is EncryptedPayload & { id: string } {
     return (
       value !== null &&

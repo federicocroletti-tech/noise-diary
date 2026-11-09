@@ -246,6 +246,11 @@ export class LocalVaultService {
     this.pendingRecoveryConfiguration = undefined;
   }
 
+  deleteConfiguration(): void {
+    localStorage.removeItem(STORAGE_KEY);
+    this.lock();
+  }
+
   async encryptJson(value: unknown): Promise<EncryptedPayload> {
     const serialized = JSON.stringify(value);
     if (serialized === undefined) {

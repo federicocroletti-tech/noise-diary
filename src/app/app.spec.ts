@@ -12,6 +12,7 @@ describe('App', () => {
     saveEvents: savedEvents,
     saveEventsAndClips: vi.fn().mockResolvedValue(undefined),
     deleteEvent: vi.fn().mockResolvedValue(undefined),
+    deleteAllLocalData: vi.fn().mockResolvedValue(undefined),
     parseImport: vi.fn(),
   };
   const vault = {
@@ -22,6 +23,7 @@ describe('App', () => {
     rotateRecoveryKey: vi.fn().mockResolvedValue('DR-11111111-22222222-33333333-44444444-55555555-66666666-77777777-88888888'),
     commitRecoveryChange: vi.fn(),
     lock: vi.fn(),
+    deleteConfiguration: vi.fn(),
   };
   const backup = {
     isEncryptedEnvelope: vi.fn().mockReturnValue(false),
@@ -32,12 +34,14 @@ describe('App', () => {
     listByEvent: vi.fn().mockResolvedValue([]),
     getByIds: vi.fn().mockResolvedValue([]),
     encryptLegacyRecords: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn(),
   };
 
   beforeEach(async () => {
     savedEvents.mockClear();
     storage.loadEvents.mockReset().mockResolvedValue([]);
     storage.deleteEvent.mockReset().mockResolvedValue(undefined);
+    storage.deleteAllLocalData.mockReset().mockResolvedValue(undefined);
     storage.saveEventsAndClips.mockReset().mockResolvedValue(undefined);
     storage.parseImport.mockReset();
     backup.isEncryptedEnvelope.mockReset().mockReturnValue(false);
@@ -56,9 +60,11 @@ describe('App', () => {
     );
     vault.commitRecoveryChange.mockReset();
     vault.lock.mockReset();
+    vault.deleteConfiguration.mockReset();
     audioClips.listByEvent.mockReset().mockResolvedValue([]);
     audioClips.getByIds.mockReset().mockResolvedValue([]);
     audioClips.encryptLegacyRecords.mockReset().mockResolvedValue(undefined);
+    audioClips.close.mockReset();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.spyOn(window, 'prompt').mockReturnValue('local-test-passphrase-2026');
     await TestBed.configureTestingModule({
@@ -130,6 +136,40 @@ describe('App', () => {
     expect(storage.loadEvents).toHaveBeenCalledOnce();
     expect(audioClips.encryptLegacyRecords).toHaveBeenCalledOnce();
     expect(savedEvents).not.toHaveBeenCalled();
+  });
+
+  it('deletes the local diary and returns to password setup only after explicit confirmation', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    await createVault(fixture);
+
+    vi.spyOn(window, 'prompt').mockReturnValue('ELIMINA');
+    const compiled = fixture.nativeElement as HTMLElement;
+    compiled.querySelector<HTMLButtonElement>('button.danger')?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(audioClips.close).toHaveBeenCalledOnce();
+    expect(storage.deleteAllLocalData).toHaveBeenCalledOnce();
+    expect(vault.deleteConfiguration).toHaveBeenCalledOnce();
+    expect(compiled.textContent).toContain('Diario locale cancellato da questo browser.');
+    expect(compiled.textContent).toContain('Proteggi il diario locale');
+  });
+
+  it('does not delete local data when the typed confirmation is not exact', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    await createVault(fixture);
+
+    vi.spyOn(window, 'prompt').mockReturnValue('elimina');
+    const compiled = fixture.nativeElement as HTMLElement;
+    compiled.querySelector<HTMLButtonElement>('button.danger')?.click();
+    await fixture.whenStable();
+
+    expect(storage.deleteAllLocalData).not.toHaveBeenCalled();
+    expect(vault.deleteConfiguration).not.toHaveBeenCalled();
   });
 
   it('creates a draft with a five-level subjective intensity and shows local audio controls', async () => {

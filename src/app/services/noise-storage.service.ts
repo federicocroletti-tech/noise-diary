@@ -77,6 +77,11 @@ export class NoiseStorageService {
     await this.repository.deleteEventAndAudio(eventId);
   }
 
+  async deleteAllLocalData(onBlocked?: () => void): Promise<void> {
+    await this.repository.deleteDatabase(onBlocked);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+  }
+
   parseImport(value: unknown): NoiseEvent[] {
     const candidate =
       Array.isArray(value) || !value || typeof value !== 'object'

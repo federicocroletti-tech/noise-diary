@@ -48,6 +48,18 @@ describe('LocalVaultService', () => {
     await expect(vault.create('another-test-passphrase')).rejects.toThrow('già protetto');
   });
 
+  it('deletes the local vault configuration and locks the data key', async () => {
+    const vault = new LocalVaultService();
+    const password = 'local-test-passphrase-2026';
+    await vault.create(password);
+
+    vault.deleteConfiguration();
+
+    expect(vault.isConfigured()).toBe(false);
+    expect(localStorage.getItem('noise-diary.vault')).toBeNull();
+    await expect(vault.unlock(password)).rejects.toThrow('non è ancora configurato');
+  });
+
   it('encrypts portable backups with the local password and rejects a wrong password', async () => {
     const vault = new LocalVaultService();
     const password = 'local-test-passphrase-2026';

@@ -212,6 +212,20 @@ describe('NoiseStorageService', () => {
     expect(storedClip).not.toHaveProperty('fileName');
   });
 
+  it('removes all local diary records and the legacy storage entry', async () => {
+    const storage = await createStorage();
+    const event = eventForDeletion('event-to-delete');
+    await storage.saveEvents([event]);
+    await putStoredAudioClip('clip-to-delete', event.id);
+    localStorage.setItem('noise-diary.events', JSON.stringify([event]));
+
+    await storage.deleteAllLocalData();
+
+    expect(localStorage.getItem('noise-diary.events')).toBeNull();
+    expect(await storage.loadEvents()).toEqual([]);
+    expect(await readStoredClipIds(event.id)).toEqual([]);
+  });
+
   it('preserves unreadable legacy data and reports the problem', async () => {
     localStorage.setItem('noise-diary.events', '{invalid');
     const storage = await createStorage();

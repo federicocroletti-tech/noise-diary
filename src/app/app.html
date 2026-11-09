@@ -10,11 +10,13 @@
         type="button"
         class="secondary"
         (click)="toggleForm()"
-        [disabled]="editingEventId() !== null"
+        [disabled]="editingEventId() !== null || authBusy()"
       >
         {{ showForm() ? 'Nascondi modulo' : 'Nuovo episodio' }}
       </button>
-      <button type="button" class="secondary" (click)="importInput.click()">Importa backup (aggiungi)</button>
+      <button type="button" class="secondary" [disabled]="authBusy()" (click)="importInput.click()">
+        Importa backup (aggiungi)
+      </button>
       <input
         #importInput
         class="visually-hidden"
@@ -22,7 +24,9 @@
         accept=".ndbackup,.json,application/json"
         (change)="importDiary($event, 'append')"
       />
-      <button type="button" class="secondary" (click)="replaceInput.click()">Ripristina backup</button>
+      <button type="button" class="secondary" [disabled]="authBusy()" (click)="replaceInput.click()">
+        Ripristina backup
+      </button>
       <input
         #replaceInput
         class="visually-hidden"
@@ -30,9 +34,16 @@
         accept=".ndbackup,.json,application/json"
         (change)="importDiary($event, 'replace')"
       />
-      <button type="button" class="primary" (click)="downloadExport()">Esporta backup cifrato</button>
-      <button type="button" class="secondary" (click)="rotateRecoveryKey()">Rigenera chiave di recupero</button>
-      <button type="button" class="secondary" (click)="lockDiary()">Blocca</button>
+      <button type="button" class="primary" [disabled]="authBusy()" (click)="downloadExport()">
+        Esporta backup cifrato
+      </button>
+      <button type="button" class="secondary" [disabled]="authBusy()" (click)="rotateRecoveryKey()">
+        Rigenera chiave di recupero
+      </button>
+      <button type="button" class="danger" [disabled]="authBusy()" (click)="deleteLocalDiary()">
+        Elimina diario locale
+      </button>
+      <button type="button" class="secondary" [disabled]="authBusy()" (click)="lockDiary()">Blocca</button>
     </div>
   </header>
 
@@ -146,6 +157,7 @@
     </ng-template>
 
     <p *ngIf="authError()" class="storage-message" role="alert">{{ authError() }}</p>
+    <p *ngIf="authStatus()" class="import-message" role="status">{{ authStatus() }}</p>
     <p *ngIf="authMode() === 'setup'" class="privacy-note">
       Conserva password e chiave di recupero separatamente. La chiave consente di impostare una nuova
       password, ma non viene salvata dall’app.
@@ -204,8 +216,11 @@
   </section>
 
   <p class="panel import-message" *ngIf="recoveryNotice()" role="status">{{ recoveryNotice() }}</p>
+  <p class="panel storage-message" *ngIf="deletingDiary()" role="status">
+    {{ storageError() || 'Cancellazione del diario in corso…' }}
+  </p>
 
-  <main class="layout" *ngIf="authMode() === 'unlocked' && !recoveryCode()">
+  <main class="layout" *ngIf="authMode() === 'unlocked' && !recoveryCode() && !deletingDiary()">
     <section class="overview panel">
       <div class="stat-card">
         <span class="label">Eventi</span>

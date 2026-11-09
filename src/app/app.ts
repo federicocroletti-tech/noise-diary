@@ -113,7 +113,9 @@ export class App implements OnDestroy {
   protected readonly recoveryCodeSaved = signal(false);
   protected readonly recoveryNotice = signal('');
   protected readonly authError = signal('');
+  protected readonly authStatus = signal('');
   protected readonly authBusy = signal(false);
+  protected readonly deletingDiary = signal(false);
   protected readonly showForm = signal(true);
   protected readonly activeView = signal<DiaryView>('list');
   protected readonly editingEventId = signal<string | null>(null);
@@ -414,6 +416,54 @@ export class App implements OnDestroy {
     this.audioError.set('');
     this.audioStatus.set('');
     this.importStatus.set('');
+  }
+
+  protected async deleteLocalDiary(): Promise<void> {
+    if (this.authMode() !== 'unlocked' || this.authBusy()) {
+      return;
+    }
+    if (this.recordingActive()) {
+      this.audioError.set('Ferma la registrazione prima di cancellare il diario.');
+      return;
+    }
+
+    const confirmation = window.prompt(
+      'Questa operazione elimina episodi, registrazioni, chiave locale e dati legacy da questo browser. ' +
+        'Non elimina backup esportati, file scaricati o copie di altri dispositivi. ' +
+        'Chiudi le altre schede del diario, poi digita ELIMINA per confermare.',
+    );
+    if (confirmation !== 'ELIMINA') {
+      return;
+    }
+
+    this.authBusy.set(true);
+    this.deletingDiary.set(true);
+    this.storageError.set('');
+    this.authStatus.set('');
+    this.audioError.set('');
+    this.audioStatus.set('');
+    this.importStatus.set('');
+    try {
+      this.audioClipRepository.close();
+      await this.storageService.deleteAllLocalData(() =>
+        this.storageError.set(
+          'Cancellazione in attesa: chiudi le altre schede del diario per completarla.',
+        ),
+      );
+      this.vault.deleteConfiguration();
+      this.clearPrivateDiary();
+      this.authMode.set('setup');
+      this.passwordInput.set('');
+      this.passwordConfirmation.set('');
+      this.authStatus.set('Diario locale cancellato da questo browser.');
+    } catch (error) {
+      this.storageError.set(
+        error instanceof Error ? error.message : 'Impossibile cancellare il diario locale.',
+      );
+    } finally {
+      this.deletingDiary.set(false);
+      this.authBusy.set(false);
+    }
   }
 
   protected async importDiary(event: Event, mode: 'replace' | 'append'): Promise<void> {
@@ -1087,6 +1137,7 @@ export class App implements OnDestroy {
     this.recoveryPasswordConfirmation.set('');
     this.importStatus.set('');
     this.storageError.set('');
+    this.authStatus.set('');
     this.loadingEvents.set(false);
   }
 
