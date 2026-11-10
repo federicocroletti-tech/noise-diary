@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { LEGACY_PROFILE_ID, vaultStorageKeyForProfile } from './local-profile.service';
 
 export interface EncryptedPayload {
   iv: ArrayBuffer;
@@ -48,7 +49,6 @@ interface WrappedDataKey {
   ciphertext: Uint8Array;
 }
 
-const STORAGE_KEY = 'noise-diary.vault';
 const VAULT_VERIFIER = 'noise-diary-local-vault-v1';
 const LEGACY_VAULT_VERSION = 1;
 const VAULT_VERSION = 2;
@@ -61,6 +61,12 @@ export class LocalVaultService {
   private key?: CryptoKey;
   private dataKeyBytes?: Uint8Array;
   private pendingRecoveryConfiguration?: RecoverableVaultConfiguration;
+  private profileId = LEGACY_PROFILE_ID;
+
+  useProfile(profileId: string): void {
+    this.lock();
+    this.profileId = profileId;
+  }
 
   isConfigured(): boolean {
     return this.readConfiguration() !== null;
@@ -76,7 +82,7 @@ export class LocalVaultService {
     const dataKeyBytes = globalThis.crypto.getRandomValues(new Uint8Array(DATA_KEY_BYTES));
     const recoveryKey = this.generateRecoveryKey();
     const configuration = await this.createConfiguration(password, dataKeyBytes, recoveryKey);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(configuration));
+    localStorage.setItem(vaultStorageKeyForProfile(this.profileId), JSON.stringify(configuration));
     await this.setDataKey(dataKeyBytes);
     return recoveryKey;
   }
@@ -110,10 +116,7 @@ export class LocalVaultService {
         throw new Error('Password non valida o configurazione del diario danneggiata.');
       }
 
-      const dataKeyBytes = await this.deriveKeyBytes(
-        password,
-        this.fromHex(configuration.salt),
-      );
+      const dataKeyBytes = await this.deriveKeyBytes(password, this.fromHex(configuration.salt));
       const recoveryKey = this.generateRecoveryKey();
       this.pendingRecoveryConfiguration = await this.createConfiguration(
         password,
@@ -165,12 +168,7 @@ export class LocalVaultService {
   async rotateRecoveryKey(): Promise<string> {
     const configuration = this.readConfiguration();
     const dataKeyBytes = this.dataKeyBytes;
-    if (
-      !this.key ||
-      !dataKeyBytes ||
-      !configuration ||
-      configuration.version !== VAULT_VERSION
-    ) {
+    if (!this.key || !dataKeyBytes || !configuration || configuration.version !== VAULT_VERSION) {
       throw new Error('Sblocca il diario prima di rigenerare la chiave di recupero.');
     }
 
@@ -198,7 +196,10 @@ export class LocalVaultService {
     if (!this.pendingRecoveryConfiguration) {
       return;
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.pendingRecoveryConfiguration));
+    localStorage.setItem(
+      vaultStorageKeyForProfile(this.profileId),
+      JSON.stringify(this.pendingRecoveryConfiguration),
+    );
     this.pendingRecoveryConfiguration = undefined;
   }
 
@@ -247,7 +248,7 @@ export class LocalVaultService {
   }
 
   deleteConfiguration(): void {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(vaultStorageKeyForProfile(this.profileId));
     this.lock();
   }
 
@@ -278,6 +279,15 @@ export class LocalVaultService {
 
   async encryptBackup(value: unknown, password: string): Promise<string> {
     await this.verifyPassword(password);
+    return this.encodeBackup(value, password);
+  }
+
+  async encryptPortableBackup(value: unknown, passphrase: string): Promise<string> {
+    this.validatePassword(passphrase);
+    return this.encodeBackup(value, passphrase);
+  }
+
+  private async encodeBackup(value: unknown, password: string): Promise<string> {
     const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
     const backupKey = await this.deriveKey(password, salt);
     const serialized = JSON.stringify(value);
@@ -332,7 +342,9 @@ export class LocalVaultService {
       );
     } catch (error) {
       if (error instanceof Error && error.name === 'OperationError') {
-        throw new Error('Password del backup errata o file danneggiato. Nessun dato è stato modificato.');
+        throw new Error(
+          'Password del backup errata o file danneggiato. Nessun dato è stato modificato.',
+        );
       }
       throw error;
     }
@@ -503,7 +515,11 @@ export class LocalVaultService {
   }
 
   private normalizeRecoveryKey(value: string): string {
-    const normalized = value.trim().replace(/^DR-/i, '').replace(/[^a-f0-9]/gi, '').toLowerCase();
+    const normalized = value
+      .trim()
+      .replace(/^DR-/i, '')
+      .replace(/[^a-f0-9]/gi, '')
+      .toLowerCase();
     if (!/^[a-f0-9]{64}$/.test(normalized)) {
       throw new Error('La chiave di recupero non ha il formato previsto.');
     }
@@ -518,12 +534,14 @@ export class LocalVaultService {
 
   private assertCryptoAvailable(): void {
     if (!globalThis.crypto?.subtle || !globalThis.crypto.getRandomValues) {
-      throw new Error('Questo browser non supporta la cifratura richiesta per proteggere il diario.');
+      throw new Error(
+        'Questo browser non supporta la cifratura richiesta per proteggere il diario.',
+      );
     }
   }
 
   private readConfiguration(): VaultConfiguration | null {
-    const serialized = localStorage.getItem(STORAGE_KEY);
+    const serialized = localStorage.getItem(vaultStorageKeyForProfile(this.profileId));
     if (!serialized) {
       return null;
     }

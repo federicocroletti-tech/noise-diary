@@ -1,5 +1,7 @@
 # Roadmap
 
+> Aggiornamento NOYSE, 2026-11-10: il piano applicativo corrente, con inventario verificato, gap e backlog, e' in [NOYSE: analisi e piano di evoluzione](./docs/NOYSE_EVOLUTION.md). La sequenza e il prossimo passo qui sotto sono storici e precedono l'integrazione cloud presente nel working tree.
+
 Le fasi sono sequenziali e soggette a revisione. Non implicano date o funzionalità già disponibili.
 
 1. **Pilota editoriale noise** — struttura `situations/`, guide organizzative, metadati, governance, indice e controlli automatici minimi.

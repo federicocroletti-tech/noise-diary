@@ -18,14 +18,16 @@ describe('LocalVaultService', () => {
     expect(JSON.stringify(encrypted)).not.toContain(value.description);
 
     vault.lock();
-    await expect(vault.decryptJson(encrypted, (item): item is typeof value => {
-      return (
-        item !== null &&
-        typeof item === 'object' &&
-        'description' in item &&
-        item.description === value.description
-      );
-    })).rejects.toThrow('Sblocca il diario');
+    await expect(
+      vault.decryptJson(encrypted, (item): item is typeof value => {
+        return (
+          item !== null &&
+          typeof item === 'object' &&
+          'description' in item &&
+          item.description === value.description
+        );
+      }),
+    ).rejects.toThrow('Sblocca il diario');
     await expect(vault.unlock('incorrect-passphrase')).rejects.toThrow('Password errata');
 
     await expect(vault.unlock(password)).resolves.toBeNull();
@@ -46,6 +48,24 @@ describe('LocalVaultService', () => {
     await vault.create('local-test-passphrase-2026');
 
     await expect(vault.create('another-test-passphrase')).rejects.toThrow('già protetto');
+  });
+
+  it('keeps vault configuration and unlock keys isolated per local profile', async () => {
+    const vault = new LocalVaultService();
+    await vault.create('first-profile-passphrase-2026');
+
+    const secondProfileId = 'profile-00000000-0000-4000-8000-000000000001';
+    vault.useProfile(secondProfileId);
+    await vault.create('second-profile-passphrase-2026');
+
+    expect(localStorage.getItem('noise-diary.vault')).not.toBeNull();
+    expect(localStorage.getItem(`noise-diary.vault.${secondProfileId}`)).not.toBeNull();
+    vault.lock();
+    await expect(vault.unlock('first-profile-passphrase-2026')).rejects.toThrow('Password errata');
+    await expect(vault.unlock('second-profile-passphrase-2026')).resolves.toBeNull();
+
+    vault.useProfile('legacy');
+    await expect(vault.unlock('first-profile-passphrase-2026')).resolves.toBeNull();
   });
 
   it('deletes the local vault configuration and locks the data key', async () => {
@@ -89,7 +109,10 @@ describe('LocalVaultService', () => {
     vault.lock();
 
     await expect(
-      vault.recover('DR-00000000-00000000-00000000-00000000-00000000-00000000-00000000-00000000', 'new-test-password-2026'),
+      vault.recover(
+        'DR-00000000-00000000-00000000-00000000-00000000-00000000-00000000-00000000',
+        'new-test-password-2026',
+      ),
     ).rejects.toThrow('Chiave di recupero errata');
 
     const secondRecoveryKey = await vault.recover(firstRecoveryKey, 'new-test-password-2026');
@@ -105,9 +128,9 @@ describe('LocalVaultService', () => {
     await expect(vault.decryptJson(encrypted, isDescription)).resolves.toEqual({
       description: 'preserved local data',
     });
-    await expect(
-      vault.recover(firstRecoveryKey, 'another-test-password-2026'),
-    ).rejects.toThrow('Chiave di recupero errata');
+    await expect(vault.recover(firstRecoveryKey, 'another-test-password-2026')).rejects.toThrow(
+      'Chiave di recupero errata',
+    );
   });
 
   it('rotates a recovery key without changing the password or encrypted data', async () => {
@@ -178,9 +201,10 @@ function isDescription(value: unknown): value is { description: string } {
   );
 }
 
-async function createLegacyVault(
-  password: string,
-): Promise<{ config: Record<string, unknown>; encrypted: { iv: ArrayBuffer; ciphertext: ArrayBuffer } }> {
+async function createLegacyVault(password: string): Promise<{
+  config: Record<string, unknown>;
+  encrypted: { iv: ArrayBuffer; ciphertext: ArrayBuffer };
+}> {
   const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
   const material = await globalThis.crypto.subtle.importKey(
     'raw',
@@ -211,7 +235,9 @@ async function createLegacyVault(
   const encryptedValue = await globalThis.crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: toArrayBuffer(encryptedIv) },
     key,
-    toArrayBuffer(new TextEncoder().encode(JSON.stringify({ description: 'legacy encrypted data' }))),
+    toArrayBuffer(
+      new TextEncoder().encode(JSON.stringify({ description: 'legacy encrypted data' })),
+    ),
   );
   const toHex = (bytes: Uint8Array): string =>
     Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');

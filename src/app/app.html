@@ -1,11 +1,28 @@
 ﻿<div class="app-shell">
   <header class="topbar">
     <div class="brand-block">
-      <span class="eyebrow">Local-first · privacy-first</span>
+      <span class="eyebrow">
+        {{
+          accountUser()
+            ? 'Account · ' + accountUser()?.email
+            : activeProfile()
+              ? 'Profilo locale · ' + activeProfile()?.name
+              : 'Account personale · diario privato'
+        }}
+      </span>
       <h1>{{ title() }}</h1>
     </div>
 
-    <div class="header-actions" *ngIf="authMode() === 'unlocked' && !recoveryCode()">
+    <div class="header-actions" *ngIf="diaryOpen() && !recoveryCode()">
+      <button
+        *ngIf="accountMode() === 'local'"
+        type="button"
+        class="secondary"
+        [disabled]="authBusy()"
+        (click)="showProfiles()"
+      >
+        Cambia profilo
+      </button>
       <button
         type="button"
         class="secondary"
@@ -24,7 +41,12 @@
         accept=".ndbackup,.json,application/json"
         (change)="importDiary($event, 'append')"
       />
-      <button type="button" class="secondary" [disabled]="authBusy()" (click)="replaceInput.click()">
+      <button
+        type="button"
+        class="secondary"
+        [disabled]="authBusy()"
+        (click)="replaceInput.click()"
+      >
         Ripristina backup
       </button>
       <input
@@ -37,26 +59,284 @@
       <button type="button" class="primary" [disabled]="authBusy()" (click)="downloadExport()">
         Esporta backup cifrato
       </button>
-      <button type="button" class="secondary" [disabled]="authBusy()" (click)="rotateRecoveryKey()">
+      <button
+        *ngIf="accountMode() === 'local'"
+        type="button"
+        class="secondary"
+        [disabled]="authBusy()"
+        (click)="rotateRecoveryKey()"
+      >
         Rigenera chiave di recupero
       </button>
       <button type="button" class="danger" [disabled]="authBusy()" (click)="deleteLocalDiary()">
-        Elimina diario locale
+        {{ accountMode() === 'signed-in' ? 'Elimina diario account' : 'Elimina diario locale' }}
       </button>
-      <button type="button" class="secondary" [disabled]="authBusy()" (click)="lockDiary()">Blocca</button>
+      <button
+        *ngIf="accountMode() === 'signed-in'"
+        type="button"
+        class="secondary"
+        [disabled]="accountBusy()"
+        (click)="signOutAccount()"
+      >
+        Esci
+      </button>
+      <button
+        *ngIf="accountMode() === 'local'"
+        type="button"
+        class="secondary"
+        [disabled]="authBusy()"
+        (click)="lockDiary()"
+      >
+        Blocca
+      </button>
+      <button
+        *ngIf="accountMode() === 'local'"
+        type="button"
+        class="secondary"
+        [disabled]="authBusy()"
+        (click)="returnToAccount()"
+      >
+        Torna all’account
+      </button>
     </div>
   </header>
 
-  <section class="panel auth-panel" *ngIf="authMode() === 'loading'" role="status">
+  <section class="panel auth-panel" *ngIf="accountMode() === 'loading'" role="status">
+    Verifica della sessione account…
+  </section>
+
+  <section
+    class="panel auth-panel"
+    *ngIf="accountMode() !== 'loading' && accountMode() !== 'signed-in' && accountMode() !== 'local'"
+  >
+    <ng-container [ngSwitch]="accountMode()">
+      <ng-container *ngSwitchCase="'login'">
+        <h2>Accedi al tuo diario</h2>
+        <p>Usa l’indirizzo email e la password dell’account. La sessione viene mantenuta su questo browser.</p>
+        <form class="auth-form" (submit)="$event.preventDefault(); submitAccountSignIn()">
+          <label>
+            <span>Email</span>
+            <input
+              type="email"
+              autocomplete="username"
+              required
+              [value]="accountEmailInput()"
+              (input)="accountEmailInput.set($any($event.target).value)"
+            />
+          </label>
+          <label>
+            <span>Password</span>
+            <input
+              type="password"
+              autocomplete="current-password"
+              required
+              [value]="accountPasswordInput()"
+              (input)="accountPasswordInput.set($any($event.target).value)"
+            />
+          </label>
+          <button type="submit" class="primary" [disabled]="accountBusy()">Accedi</button>
+        </form>
+        <div class="audio-file-actions">
+          <button type="button" class="secondary" (click)="setAccountMode('signup')">Crea account</button>
+          <button type="button" class="secondary" (click)="setAccountMode('forgot-password')">
+            Password dimenticata?
+          </button>
+          <button type="button" class="secondary" (click)="openLocalDiary()" [disabled]="accountBusy()">
+            Apri diario salvato in questo browser
+          </button>
+        </div>
+      </ng-container>
+
+      <ng-container *ngSwitchCase="'signup'">
+        <h2>Crea un account</h2>
+        <p>La verifica email è necessaria prima di poter accedere al diario.</p>
+        <form class="auth-form" (submit)="$event.preventDefault(); submitAccountSignUp()">
+          <label>
+            <span>Email</span>
+            <input
+              type="email"
+              autocomplete="username"
+              required
+              [value]="accountEmailInput()"
+              (input)="accountEmailInput.set($any($event.target).value)"
+            />
+          </label>
+          <label>
+            <span>Password (almeno 12 caratteri)</span>
+            <input
+              type="password"
+              autocomplete="new-password"
+              minlength="12"
+              required
+              [value]="accountPasswordInput()"
+              (input)="accountPasswordInput.set($any($event.target).value)"
+            />
+          </label>
+          <label>
+            <span>Conferma password</span>
+            <input
+              type="password"
+              autocomplete="new-password"
+              required
+              [value]="accountPasswordConfirmation()"
+              (input)="accountPasswordConfirmation.set($any($event.target).value)"
+            />
+          </label>
+          <button type="submit" class="primary" [disabled]="accountBusy()">Crea account</button>
+          <button type="button" class="secondary" (click)="setAccountMode('login')">
+            Torna all’accesso
+          </button>
+        </form>
+      </ng-container>
+
+      <ng-container *ngSwitchCase="'verify-email'">
+        <h2>Verifica la tua email</h2>
+        <p>Inserisci il codice ricevuto via email all’indirizzo {{ accountEmailInput() }}.</p>
+        <form class="auth-form" (submit)="$event.preventDefault(); verifyAccountEmail()">
+          <label>
+            <span>Codice di verifica</span>
+            <input
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              required
+              [value]="accountOtpInput()"
+              (input)="accountOtpInput.set($any($event.target).value)"
+            />
+          </label>
+          <button type="submit" class="primary" [disabled]="accountBusy()">Verifica email</button>
+        </form>
+        <button type="button" class="secondary" [disabled]="accountBusy()" (click)="resendVerificationOtp()">
+          Invia un nuovo codice
+        </button>
+        <button type="button" class="secondary" (click)="setAccountMode('login')">Torna all’accesso</button>
+      </ng-container>
+
+      <ng-container *ngSwitchCase="'forgot-password'">
+        <h2>Recupera la password</h2>
+        <p>Ti invieremo un codice email per scegliere una nuova password.</p>
+        <form class="auth-form" (submit)="$event.preventDefault(); requestAccountPasswordReset()">
+          <label>
+            <span>Email dell’account</span>
+            <input
+              type="email"
+              autocomplete="username"
+              required
+              [value]="accountEmailInput()"
+              (input)="accountEmailInput.set($any($event.target).value)"
+            />
+          </label>
+          <button type="submit" class="primary" [disabled]="accountBusy()">Invia codice</button>
+          <button type="button" class="secondary" (click)="setAccountMode('login')">
+            Torna all’accesso
+          </button>
+        </form>
+      </ng-container>
+
+      <ng-container *ngSwitchCase="'reset-password'">
+        <h2>Scegli una nuova password</h2>
+        <p>Inserisci il codice inviato a {{ accountEmailInput() }}.</p>
+        <form class="auth-form" (submit)="$event.preventDefault(); resetAccountPassword()">
+          <label>
+            <span>Codice ricevuto via email</span>
+            <input
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              required
+              [value]="accountOtpInput()"
+              (input)="accountOtpInput.set($any($event.target).value)"
+            />
+          </label>
+          <label>
+            <span>Nuova password (almeno 12 caratteri)</span>
+            <input
+              type="password"
+              autocomplete="new-password"
+              minlength="12"
+              required
+              [value]="accountPasswordInput()"
+              (input)="accountPasswordInput.set($any($event.target).value)"
+            />
+          </label>
+          <label>
+            <span>Conferma password</span>
+            <input
+              type="password"
+              autocomplete="new-password"
+              required
+              [value]="accountPasswordConfirmation()"
+              (input)="accountPasswordConfirmation.set($any($event.target).value)"
+            />
+          </label>
+          <button type="submit" class="primary" [disabled]="accountBusy()">Aggiorna password</button>
+          <button type="button" class="secondary" (click)="setAccountMode('login')">
+            Torna all’accesso
+          </button>
+        </form>
+      </ng-container>
+    </ng-container>
+    <p *ngIf="accountError()" class="storage-message" role="alert">{{ accountError() }}</p>
+    <p *ngIf="accountStatus()" class="import-message" role="status">{{ accountStatus() }}</p>
+  </section>
+
+  <section class="panel auth-panel" *ngIf="accountMode() === 'local' && authMode() === 'loading'" role="status">
     Verifica della protezione locale…
   </section>
 
-  <section class="panel auth-panel" *ngIf="authMode() !== 'loading' && authMode() !== 'unlocked'">
+  <section class="panel auth-panel" *ngIf="accountMode() === 'local' && authMode() === 'profiles'">
+    <button type="button" class="secondary" (click)="returnToAccount()">Torna all’accesso account</button>
+    <h2>Profili locali</h2>
+    <p>
+      Ogni profilo ha password, chiave di recupero, episodi e registrazioni separati e cifrati in
+      questo browser. Non sono account online e non si sincronizzano tra dispositivi.
+    </p>
+    <div class="profile-list" *ngIf="profiles().length > 0">
+      <button
+        *ngFor="let profile of profiles()"
+        type="button"
+        class="secondary profile-button"
+        (click)="selectProfile(profile)"
+      >
+        {{ profile.name }}{{ profile.legacy ? ' · diario esistente' : '' }}
+      </button>
+    </div>
+    <form class="auth-form" (submit)="$event.preventDefault(); createProfile()">
+      <label>
+        <span>Crea un nuovo profilo</span>
+        <input
+          type="text"
+          autocomplete="off"
+          maxlength="40"
+          required
+          [value]="profileNameInput()"
+          (input)="profileNameInput.set($any($event.target).value)"
+        />
+      </label>
+      <button type="submit" class="primary" [disabled]="authBusy()">Crea profilo</button>
+    </form>
+    <p class="privacy-note" *ngIf="profiles().length === 0">
+      Il diario precedente non viene cancellato né importato automaticamente. Per trasferirlo,
+      sbloccane il profilo e crea prima un backup cifrato.
+    </p>
+    <p *ngIf="authError()" class="storage-message" role="alert">{{ authError() }}</p>
+    <p *ngIf="authStatus()" class="import-message" role="status">{{ authStatus() }}</p>
+  </section>
+
+  <section
+    class="panel auth-panel"
+    *ngIf="accountMode() === 'local' && authMode() !== 'loading' && authMode() !== 'unlocked' && authMode() !== 'profiles'"
+  >
+    <button type="button" class="secondary" [disabled]="authBusy()" (click)="showProfiles()">
+      Torna ai profili
+    </button>
     <ng-container *ngIf="authMode() === 'setup'; else existingVault">
       <h2>Proteggi il diario locale</h2>
       <p>
-        I dati e le registrazioni saranno cifrati su questo dispositivo. La password non viene inviata
-        a un server. La chiave di recupero ti permette di impostare una nuova password se la dimentichi.
+        Profilo <strong>{{ activeProfile()?.name }}</strong
+        >. Dati e registrazioni saranno cifrati su questo dispositivo. La password non viene inviata
+        a un server. La chiave di recupero ti permette di impostare una nuova password se la
+        dimentichi.
       </p>
       <form class="auth-form" (submit)="$event.preventDefault(); submitVaultAccess()">
         <label>
@@ -80,16 +360,23 @@
             (input)="passwordConfirmation.set($any($event.target).value)"
           />
         </label>
-        <button type="submit" class="primary" [disabled]="authBusy()">Crea password e sblocca</button>
+        <button type="submit" class="primary" [disabled]="authBusy()">
+          Crea password e sblocca
+        </button>
       </form>
     </ng-container>
 
     <ng-template #existingVault>
       <ng-container *ngIf="authMode() === 'locked'; else unavailableVault">
-        <h2>Sblocca diario</h2>
+        <h2>Sblocca {{ activeProfile()?.name }}</h2>
+        <p>
+          La password appartiene solo a questo profilo locale. Se non viene accettata, verifica di
+          aver selezionato il profilo corretto; per cambiarla senza perdere i dati serve la relativa
+          chiave di recupero.
+        </p>
         <form class="auth-form" (submit)="$event.preventDefault(); submitVaultAccess()">
           <label>
-            <span>Password locale</span>
+            <span>Password del profilo</span>
             <input
               type="password"
               autocomplete="current-password"
@@ -100,12 +387,12 @@
           </label>
           <button type="submit" class="primary" [disabled]="authBusy()">Sblocca diario</button>
         </form>
-        <button
-          type="button"
-          class="secondary"
-          (click)="toggleRecoveryMode()"
-        >
-          {{ recoveryMode() ? 'Torna allo sblocco' : 'Password dimenticata? Usa la chiave di recupero' }}
+        <button type="button" class="secondary" (click)="toggleRecoveryMode()">
+          {{
+            recoveryMode()
+              ? 'Torna allo sblocco'
+              : 'Password dimenticata? Usa la chiave di recupero'
+          }}
         </button>
         <form
           *ngIf="recoveryMode()"
@@ -159,8 +446,8 @@
     <p *ngIf="authError()" class="storage-message" role="alert">{{ authError() }}</p>
     <p *ngIf="authStatus()" class="import-message" role="status">{{ authStatus() }}</p>
     <p *ngIf="authMode() === 'setup'" class="privacy-note">
-      Conserva password e chiave di recupero separatamente. La chiave consente di impostare una nuova
-      password, ma non viene salvata dall’app.
+      Conserva password e chiave di recupero separatamente. La chiave consente di impostare una
+      nuova password, ma non viene salvata dall’app.
     </p>
   </section>
 
@@ -173,9 +460,9 @@
   >
     <h2 id="recovery-title">Conserva la chiave di recupero</h2>
     <p>
-      Questa chiave viene mostrata una sola volta. Conservala offline e separatamente dal dispositivo.
-      Chiunque la possieda può impostare una nuova password e accedere ai dati cifrati. Se la perdi,
-      il recupero non sarà possibile.
+      Questa chiave viene mostrata una sola volta. Conservala offline e separatamente dal
+      dispositivo. Chiunque la possieda può impostare una nuova password e accedere ai dati cifrati.
+      Se la perdi, il recupero non sarà possibile.
     </p>
     <label>
       <span>Chiave di recupero</span>
@@ -220,7 +507,7 @@
     {{ storageError() || 'Cancellazione del diario in corso…' }}
   </p>
 
-  <main class="layout" *ngIf="authMode() === 'unlocked' && !recoveryCode() && !deletingDiary()">
+  <main class="layout" *ngIf="diaryOpen() && !recoveryCode() && !deletingDiary()">
     <section class="overview panel">
       <div class="stat-card">
         <span class="label">Eventi</span>
@@ -232,13 +519,21 @@
       </div>
       <div class="stat-card highlight">
         <span class="label">Stato</span>
-        <strong>Offline</strong>
+        <strong>{{ accountMode() === 'signed-in' ? 'Account' : 'Locale' }}</strong>
       </div>
     </section>
 
-    <section class="panel storage-message" *ngIf="storageError()" role="alert">{{ storageError() }}</section>
-    <section class="panel import-message" *ngIf="importStatus()" role="status">{{ importStatus() }}</section>
-    <section class="panel import-review" *ngIf="pendingAppendImport() as pending" aria-labelledby="import-review-title">
+    <section class="panel storage-message" *ngIf="storageError()" role="alert">
+      {{ storageError() }}
+    </section>
+    <section class="panel import-message" *ngIf="importStatus()" role="status">
+      {{ importStatus() }}
+    </section>
+    <section
+      class="panel import-review"
+      *ngIf="pendingAppendImport() as pending"
+      aria-labelledby="import-review-title"
+    >
       <h2 id="import-review-title">Episodi con lo stesso ID</h2>
       <p>Le registrazioni audio vengono aggiunte senza eliminare quelle locali.</p>
       <ul>
@@ -266,45 +561,87 @@
         </li>
       </ul>
       <div class="audio-file-actions">
-        <button type="button" class="secondary" (click)="cancelAppendImport()">Annulla importazione</button>
-        <button type="button" class="primary" (click)="confirmAppendImport()">Completa importazione</button>
+        <button type="button" class="secondary" (click)="cancelAppendImport()">
+          Annulla importazione
+        </button>
+        <button type="button" class="primary" (click)="confirmAppendImport()">
+          Completa importazione
+        </button>
       </div>
     </section>
-    <section class="panel storage-message" *ngIf="loadingEvents()" role="status">Caricamento del diario locale…</section>
+    <section class="panel storage-message" *ngIf="loadingEvents()" role="status">
+      {{ accountMode() === 'signed-in' ? 'Caricamento del diario account…' : 'Caricamento del diario locale…' }}
+    </section>
 
     <section class="panel form-panel" *ngIf="showForm() && !loadingEvents()">
       <div class="section-heading">
         <h2>{{ editingEventId() ? 'Modifica episodio' : 'Nuovo episodio' }}</h2>
-        <span>Riservato al dispositivo dell'utente</span>
+        <span>
+          {{ accountMode() === 'signed-in' ? 'Dati associati al tuo account' : 'Dati locali di questo dispositivo' }}
+        </span>
       </div>
 
       <form class="event-form" (submit)="$event.preventDefault(); submitDraft()">
         <label>
           <span>Luogo</span>
-          <input type="text" [value]="draft().locationLabel" (input)="onFieldChange('locationLabel', $any($event.target).value)" placeholder="Es. Cucina, stanza notte" />
+          <input
+            type="text"
+            [value]="draft().locationLabel"
+            (input)="onFieldChange('locationLabel', $any($event.target).value)"
+            placeholder="Es. Cucina, stanza notte"
+          />
         </label>
 
         <div class="two-columns">
           <label>
             <span>Data e ora di inizio</span>
-            <input type="datetime-local" required [value]="draft().startedAt" (input)="onFieldChange('startedAt', $any($event.target).value)" />
+            <input
+              type="datetime-local"
+              required
+              [value]="draft().startedAt"
+              (input)="onFieldChange('startedAt', $any($event.target).value)"
+            />
           </label>
           <label>
             <span>Durata (minuti, facoltativa)</span>
-            <input type="number" min="1" step="1" [value]="draft().durationMinutes ?? ''" (input)="onFieldChange('durationMinutes', $any($event.target).value ? +$any($event.target).value : null)" />
+            <input
+              type="number"
+              min="1"
+              step="1"
+              [value]="draft().durationMinutes ?? ''"
+              (input)="
+                onFieldChange(
+                  'durationMinutes',
+                  $any($event.target).value ? +$any($event.target).value : null
+                )
+              "
+            />
           </label>
         </div>
 
         <div class="two-columns">
           <label>
             <span>Stanza</span>
-            <input type="text" [value]="draft().room" (input)="onFieldChange('room', $any($event.target).value)" />
+            <input
+              type="text"
+              [value]="draft().room"
+              (input)="onFieldChange('room', $any($event.target).value)"
+            />
           </label>
 
           <label>
             <span>Tipo evento</span>
-            <select [value]="draft().eventType" (change)="onFieldChange('eventType', $any($event.target).value)">
-              <option *ngFor="let option of eventTypeOptions" [value]="option" [selected]="option === draft().eventType">{{ labelFor(option) }}</option>
+            <select
+              [value]="draft().eventType"
+              (change)="onFieldChange('eventType', $any($event.target).value)"
+            >
+              <option
+                *ngFor="let option of eventTypeOptions"
+                [value]="option"
+                [selected]="option === draft().eventType"
+              >
+                {{ labelFor(option) }}
+              </option>
             </select>
           </label>
         </div>
@@ -313,17 +650,47 @@
           <div>
             <label>
               <span>Intensità percepita (1–5, soggettiva)</span>
-              <input type="range" min="1" max="5" step="1" [value]="draft().perceivedIntensity" (input)="intensityUnreported.set(false); onFieldChange('perceivedIntensity', +$any($event.target).value)" />
-              <small *ngIf="intensityUnreported()">Non indicata; aggiungi una valutazione solo se vuoi.</small>
-              <small *ngIf="!intensityUnreported()">{{ draft().perceivedIntensity }}/5 · valutazione personale</small>
+              <input
+                type="range"
+                min="1"
+                max="5"
+                step="1"
+                [value]="draft().perceivedIntensity"
+                (input)="
+                  intensityUnreported.set(false);
+                  onFieldChange('perceivedIntensity', +$any($event.target).value)
+                "
+              />
+              <small *ngIf="intensityUnreported()"
+                >Non indicata; aggiungi una valutazione solo se vuoi.</small
+              >
+              <small *ngIf="!intensityUnreported()"
+                >{{ draft().perceivedIntensity }}/5 · valutazione personale</small
+              >
             </label>
-            <button *ngIf="intensityUnreported()" type="button" class="secondary" (click)="intensityUnreported.set(false)">Indica un'intensità</button>
+            <button
+              *ngIf="intensityUnreported()"
+              type="button"
+              class="secondary"
+              (click)="intensityUnreported.set(false)"
+            >
+              Indica un'intensità
+            </button>
           </div>
 
           <label>
             <span>Andamento</span>
-            <select [value]="draft().continuityType" (change)="onFieldChange('continuityType', $any($event.target).value)">
-              <option *ngFor="let option of continuityOptions" [value]="option" [selected]="option === draft().continuityType">{{ labelFor(option) }}</option>
+            <select
+              [value]="draft().continuityType"
+              (change)="onFieldChange('continuityType', $any($event.target).value)"
+            >
+              <option
+                *ngFor="let option of continuityOptions"
+                [value]="option"
+                [selected]="option === draft().continuityType"
+              >
+                {{ labelFor(option) }}
+              </option>
             </select>
           </label>
         </div>
@@ -332,53 +699,99 @@
           <div *ngIf="effectsUnreported(); else effectsControl">
             <span>Effetto percepito</span>
             <p>Non indicato</p>
-            <button type="button" class="secondary" (click)="effectsUnreported.set(false)">Seleziona un effetto</button>
+            <button type="button" class="secondary" (click)="effectsUnreported.set(false)">
+              Seleziona un effetto
+            </button>
           </div>
           <ng-template #effectsControl>
             <label>
               <span>Effetto percepito</span>
-              <select [value]="draft().perceivedEffects" (change)="onFieldChange('perceivedEffects', $any($event.target).value)">
-                <option *ngFor="let option of perceivedEffectOptions" [value]="option" [selected]="option === draft().perceivedEffects">{{ labelFor(option) }}</option>
+              <select
+                [value]="draft().perceivedEffects"
+                (change)="onFieldChange('perceivedEffects', $any($event.target).value)"
+              >
+                <option
+                  *ngFor="let option of perceivedEffectOptions"
+                  [value]="option"
+                  [selected]="option === draft().perceivedEffects"
+                >
+                  {{ labelFor(option) }}
+                </option>
               </select>
             </label>
           </ng-template>
           <label>
             <span>Stato</span>
-            <select [value]="draft().status" (change)="onFieldChange('status', $any($event.target).value)">
-              <option *ngFor="let option of statusOptions" [value]="option" [selected]="option === draft().status">{{ labelFor(option) }}</option>
+            <select
+              [value]="draft().status"
+              (change)="onFieldChange('status', $any($event.target).value)"
+            >
+              <option
+                *ngFor="let option of statusOptions"
+                [value]="option"
+                [selected]="option === draft().status"
+              >
+                {{ labelFor(option) }}
+              </option>
             </select>
           </label>
         </div>
 
         <label>
           <span>Sorgente sospetta</span>
-          <input type="text" [value]="draft().suspectedSource" (input)="onFieldChange('suspectedSource', $any($event.target).value)" />
+          <input
+            type="text"
+            [value]="draft().suspectedSource"
+            (input)="onFieldChange('suspectedSource', $any($event.target).value)"
+          />
         </label>
 
         <label>
           <span>Descrizione</span>
-          <textarea rows="3" [value]="draft().description" (input)="onFieldChange('description', $any($event.target).value)" placeholder="Descrivi la percezione soggettiva e il contesto."></textarea>
+          <textarea
+            rows="3"
+            [value]="draft().description"
+            (input)="onFieldChange('description', $any($event.target).value)"
+            placeholder="Descrivi la percezione soggettiva e il contesto."
+          ></textarea>
         </label>
 
         <label>
           <span>Note</span>
-          <textarea rows="2" [value]="draft().notes" (input)="onFieldChange('notes', $any($event.target).value)" placeholder="Eventi e osservazioni rilevanti."></textarea>
+          <textarea
+            rows="2"
+            [value]="draft().notes"
+            (input)="onFieldChange('notes', $any($event.target).value)"
+            placeholder="Eventi e osservazioni rilevanti."
+          ></textarea>
         </label>
 
         <label>
           <span>Tag (separati da virgola)</span>
-          <input type="text" [value]="draft().tags" (input)="onFieldChange('tags', $any($event.target).value)" />
+          <input
+            type="text"
+            [value]="draft().tags"
+            (input)="onFieldChange('tags', $any($event.target).value)"
+          />
         </label>
 
         <div class="two-columns">
           <label>
             <span>Finestre</span>
-            <input type="text" [value]="draft().windowsState" (input)="onFieldChange('windowsState', $any($event.target).value)" />
+            <input
+              type="text"
+              [value]="draft().windowsState"
+              (input)="onFieldChange('windowsState', $any($event.target).value)"
+            />
           </label>
 
           <label>
             <span>Porta</span>
-            <input type="text" [value]="draft().doorsState" (input)="onFieldChange('doorsState', $any($event.target).value)" />
+            <input
+              type="text"
+              [value]="draft().doorsState"
+              (input)="onFieldChange('doorsState', $any($event.target).value)"
+            />
           </label>
         </div>
 
@@ -447,7 +860,13 @@
       </ul>
 
       <ng-template #emptyState>
-        <p class="empty-state">Nessun episodio nel diario. Crea un episodio o importa un backup cifrato; i dati restano cifrati su questo dispositivo.</p>
+        <p class="empty-state">
+          {{
+            accountMode() === 'signed-in'
+              ? 'Nessun episodio nel diario. I nuovi episodi saranno salvati nel tuo account cloud.'
+              : 'Nessun episodio nel diario. Crea un episodio o importa un backup cifrato; i dati restano cifrati su questo dispositivo.'
+          }}
+        </p>
       </ng-template>
     </section>
 
@@ -467,15 +886,35 @@
       </div>
 
       <div class="audio-file-actions">
-        <button type="button" class="secondary" (click)="beginEdit(event)" aria-label="Modifica episodio">Modifica episodio</button>
-        <button type="button" class="danger" (click)="deleteEvent(event)" aria-label="Elimina episodio">Elimina episodio</button>
+        <button
+          type="button"
+          class="secondary"
+          (click)="beginEdit(event)"
+          aria-label="Modifica episodio"
+        >
+          Modifica episodio
+        </button>
+        <button
+          type="button"
+          class="danger"
+          (click)="deleteEvent(event)"
+          aria-label="Elimina episodio"
+        >
+          Elimina episodio
+        </button>
       </div>
 
       <section class="audio-section" aria-labelledby="audio-heading">
         <div class="audio-heading">
           <div>
             <h4 id="audio-heading">Registrazioni audio</h4>
-            <p>Acquisite dal microfono e conservate solo in questo browser.</p>
+            <p>
+              {{
+                accountMode() === 'signed-in'
+                  ? 'Acquisite dal microfono e caricate nello storage privato del tuo account. Non sono cifrate end-to-end.'
+                  : 'Acquisite dal microfono e conservate solo in questo browser.'
+              }}
+            </p>
           </div>
           <span *ngIf="recordingActive()" class="recording-indicator" role="status">
             <span class="recording-dot"></span>
@@ -497,8 +936,14 @@
         </label>
 
         <p class="audio-consent">
-          La registrazione inizia solo dopo aver premuto il pulsante. Evita di acquisire conversazioni o persone non necessarie.
-          Limite massimo: {{ maxRecordingSeconds / 60 }} minuti o 50 MB. Nessun audio viene caricato online.
+          La registrazione inizia solo dopo aver premuto il pulsante. Evita di acquisire
+          conversazioni o persone non necessarie. Limite massimo:
+          {{ maxRecordingSeconds / 60 }} minuti o 50 MB.
+          {{
+            accountMode() === 'signed-in'
+              ? 'Al salvataggio, l’audio viene caricato nel tuo account cloud.'
+              : 'Nessun audio viene caricato online.'
+          }}
         </p>
 
         <div class="audio-controls">
@@ -530,13 +975,20 @@
             >
               Riprendi
             </button>
-            <button type="button" class="danger" (click)="stopAudioRecording()" aria-label="Ferma e salva la registrazione">
+            <button
+              type="button"
+              class="danger"
+              (click)="stopAudioRecording()"
+              aria-label="Ferma e salva la registrazione"
+            >
               Ferma e salva
             </button>
           </ng-container>
         </div>
 
-        <p *ngIf="audioStatus()" class="audio-status" role="status" aria-live="polite">{{ audioStatus() }}</p>
+        <p *ngIf="audioStatus()" class="audio-status" role="status" aria-live="polite">
+          {{ audioStatus() }}
+        </p>
         <p *ngIf="audioError()" class="audio-error" role="alert">{{ audioError() }}</p>
 
         <ul class="audio-list" *ngIf="audioClips().length; else noAudio">
@@ -555,11 +1007,17 @@
             </div>
             <details>
               <summary>Integrità e provenienza</summary>
-              <p>SHA-256: <code>{{ clip.sha256 }}</code></p>
-              <p>Origine: microfono · piattaforma: {{ clip.device.platform || 'non disponibile' }}</p>
+              <p>
+                SHA-256: <code>{{ clip.sha256 }}</code>
+              </p>
+              <p>
+                Origine: microfono · piattaforma: {{ clip.device.platform || 'non disponibile' }}
+              </p>
             </details>
             <div class="audio-file-actions">
-              <button type="button" class="secondary" (click)="downloadAudioClip(clip)">Scarica copia</button>
+              <button type="button" class="secondary" (click)="downloadAudioClip(clip)">
+                Scarica copia
+              </button>
               <button type="button" class="danger" (click)="deleteAudioClip(clip)">Elimina</button>
             </div>
           </li>
@@ -570,15 +1028,30 @@
       </section>
 
       <div class="meta-grid">
-        <div><span>Intensità percepita</span><strong>{{ event.perceivedIntensity === null ? 'Non indicata' : event.perceivedIntensity + '/5 · soggettiva' }}</strong></div>
-        <div><span>Sorgente</span><strong>{{ event.suspectedSource }}</strong></div>
-        <div><span>Finestra</span><strong>{{ event.windowsState ?? 'non indicata' }}</strong></div>
-        <div><span>Porta</span><strong>{{ event.doorsState ?? 'non indicata' }}</strong></div>
+        <div>
+          <span>Intensità percepita</span
+          ><strong>{{
+            event.perceivedIntensity === null
+              ? 'Non indicata'
+              : event.perceivedIntensity + '/5 · soggettiva'
+          }}</strong>
+        </div>
+        <div>
+          <span>Sorgente</span><strong>{{ event.suspectedSource }}</strong>
+        </div>
+        <div>
+          <span>Finestra</span><strong>{{ event.windowsState ?? 'non indicata' }}</strong>
+        </div>
+        <div>
+          <span>Porta</span><strong>{{ event.doorsState ?? 'non indicata' }}</strong>
+        </div>
       </div>
 
       <div class="chart-panel">
         <h4>Analisi frequenze (informativa)</h4>
-        <p class="empty-state">Analisi non disponibile: nessun dato è stato calcolato per questo episodio.</p>
+        <p class="empty-state">
+          Analisi non disponibile: nessun dato è stato calcolato per questo episodio.
+        </p>
       </div>
 
       <div class="notes-block">
@@ -603,6 +1076,7 @@
   </main>
 
   <footer class="disclaimer">
-    <strong>Disclaimer:</strong> le misurazioni sono indicative, non calibrate, dipendenti dal microfono del dispositivo e non equivalenti a rilevazioni fonometriche professionali.
+    <strong>Disclaimer:</strong> le misurazioni sono indicative, non calibrate, dipendenti dal
+    microfono del dispositivo e non equivalenti a rilevazioni fonometriche professionali.
   </footer>
 </div>

@@ -3,8 +3,8 @@ import { AudioClip } from '../audio/models/audio-clip.model';
 import { encryptAudioClip } from '../audio/audio-clip.repository';
 import { isNoiseEvent, NoiseEvent } from '../domain/noise-event.model';
 import { EncryptedPayload, isArrayBuffer, LocalVaultService } from './local-vault.service';
+import { databaseNameForProfile, LEGACY_PROFILE_ID } from './local-profile.service';
 
-const DATABASE_NAME = 'noise-diary';
 const DATABASE_VERSION = 2;
 const STORE_NAME = 'noise-events';
 const AUDIO_STORE_NAME = 'audio-clips';
@@ -13,8 +13,14 @@ const AUDIO_STORE_NAME = 'audio-clips';
 export class NoiseEventRepository {
   private databasePromise?: Promise<IDBDatabase>;
   private database?: IDBDatabase;
+  private profileId = LEGACY_PROFILE_ID;
 
   constructor(private readonly vault: LocalVaultService) {}
+
+  useProfile(profileId: string): void {
+    this.close();
+    this.profileId = profileId;
+  }
 
   async getAll(): Promise<NoiseEvent[]> {
     const database = await this.openDatabase();
@@ -32,7 +38,9 @@ export class NoiseEventRepository {
           return event;
         }
         if (!isNoiseEvent(record)) {
-          throw new Error('Un episodio salvato non è leggibile; i dati locali non sono stati modificati.');
+          throw new Error(
+            'Un episodio salvato non è leggibile; i dati locali non sono stati modificati.',
+          );
         }
         needsMigration.push(record);
         return record;
@@ -71,7 +79,9 @@ export class NoiseEventRepository {
       throw new Error('Una registrazione audio non è associata a un episodio del diario.');
     }
     if (new Set(clips.map((clip) => clip.id)).size !== clips.length) {
-      throw new Error('Il backup contiene ID registrazione duplicati; i dati locali non sono stati modificati.');
+      throw new Error(
+        'Il backup contiene ID registrazione duplicati; i dati locali non sono stati modificati.',
+      );
     }
 
     const [encryptedEvents, encryptedClips] = await Promise.all([
@@ -142,7 +152,7 @@ export class NoiseEventRepository {
   async deleteDatabase(onBlocked?: () => void): Promise<void> {
     this.close();
     await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.deleteDatabase(DATABASE_NAME);
+      const request = indexedDB.deleteDatabase(databaseNameForProfile(this.profileId));
       request.onsuccess = () => resolve();
       request.onerror = () =>
         reject(request.error ?? new Error('Impossibile cancellare i dati locali del diario.'));
@@ -169,7 +179,7 @@ export class NoiseEventRepository {
     }
 
     this.databasePromise ??= new Promise((resolve, reject) => {
-      const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
+      const request = indexedDB.open(databaseNameForProfile(this.profileId), DATABASE_VERSION);
       request.onupgradeneeded = () => {
         const database = request.result;
         if (!database.objectStoreNames.contains('audio-clips')) {
@@ -191,7 +201,11 @@ export class NoiseEventRepository {
       };
       request.onblocked = () => {
         this.databasePromise = undefined;
-        reject(new Error('Aggiornamento IndexedDB bloccato da un’altra scheda. Chiudi le altre schede e riprova.'));
+        reject(
+          new Error(
+            'Aggiornamento IndexedDB bloccato da un’altra scheda. Chiudi le altre schede e riprova.',
+          ),
+        );
       };
     });
 
@@ -210,10 +224,13 @@ export class NoiseEventRepository {
       request.onsuccess = () => {
         result = request.result;
       };
-      request.onerror = () => reject(request.error ?? new Error('Operazione sugli episodi non riuscita.'));
+      request.onerror = () =>
+        reject(request.error ?? new Error('Operazione sugli episodi non riuscita.'));
       transaction.oncomplete = () => resolve(result);
-      transaction.onabort = () => reject(transaction.error ?? new Error('Transazione episodi annullata.'));
-      transaction.onerror = () => reject(transaction.error ?? new Error('Errore nella transazione episodi.'));
+      transaction.onabort = () =>
+        reject(transaction.error ?? new Error('Transazione episodi annullata.'));
+      transaction.onerror = () =>
+        reject(transaction.error ?? new Error('Errore nella transazione episodi.'));
     });
   }
 }

@@ -34,6 +34,61 @@ describe('LocalBackupService', () => {
     );
   });
 
+  it('exports account data without a local vault and restores it on a clean device', async () => {
+    vault.deleteConfiguration();
+    const passphrase = 'independent-backup-passphrase-2026';
+    const clip = await createClip(new TextEncoder().encode('synthetic cloud recording'));
+    const event = createEvent(clip.id);
+
+    const encrypted = await backupService.encrypt([event], [clip], passphrase, 'account');
+    expect(vault.isConfigured()).toBe(false);
+    expect(encrypted).not.toContain(event.locationLabel);
+
+    const cleanVault = new LocalVaultService();
+    const cleanBackup = new LocalBackupService(cleanVault);
+    const envelope: unknown = JSON.parse(encrypted);
+    await expect(cleanBackup.decrypt(envelope, 'incorrect-passphrase')).rejects.toThrow(
+      'Password del backup errata',
+    );
+    expect(cleanVault.isConfigured()).toBe(false);
+    const restored = await cleanBackup.decrypt(envelope, passphrase);
+    expect(restored.events).toEqual([event]);
+    expect(restored.audioClips).toHaveLength(1);
+    expect(await restored.audioClips[0].blob.arrayBuffer()).toEqual(await clip.blob.arrayBuffer());
+    expect(cleanVault.isConfigured()).toBe(false);
+  });
+
+  it('keeps the existing local vault and password unchanged during account export', async () => {
+    const encryptedLocalData = await vault.encryptJson({ description: 'local data preserved' });
+    const configuration = localStorage.getItem('noise-diary.vault');
+    vault.lock();
+
+    await backupService.encrypt([], [], 'independent-backup-passphrase-2026', 'account');
+
+    expect(localStorage.getItem('noise-diary.vault')).toBe(configuration);
+    await expect(vault.unlock(password)).resolves.toBeNull();
+    await expect(
+      vault.decryptJson(encryptedLocalData, (value): value is { description: string } =>
+        value !== null && typeof value === 'object' && 'description' in value &&
+        typeof value.description === 'string',
+      ),
+    ).resolves.toEqual({ description: 'local data preserved' });
+  });
+
+  it('rejects a short account backup passphrase without creating a local vault', async () => {
+    vault.deleteConfiguration();
+    await expect(backupService.encrypt([], [], 'short', 'account')).rejects.toThrow(
+      'almeno 12 caratteri',
+    );
+    expect(vault.isConfigured()).toBe(false);
+  });
+
+  it('continues to require the existing local vault password for local exports', async () => {
+    await expect(backupService.encrypt([], [], 'another-long-passphrase')).rejects.toThrow(
+      'Password errata',
+    );
+  });
+
   it('rejects audio whose SHA-256 does not match the backup metadata', async () => {
     const bytes = new TextEncoder().encode('synthetic audio evidence');
     const clip = await createClip(bytes);

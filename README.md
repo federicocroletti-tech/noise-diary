@@ -1,17 +1,19 @@
 # Diario Rumore
 
-Diario Rumore è una PWA local-first per annotare episodi di rumore domestico e ambientale. Il progetto sta evolvendo da diario personale a risorsa documentale aperta, multilingue e revisionata per organizzare situazioni domestiche, condominiali e tecniche.
+Diario Rumore è una PWA per annotare episodi di rumore domestico e ambientale. Supporta account online email/password con sincronizzazione privata e mantiene separato il diario locale storico.
 
 ## Cosa offre oggi
 
 - Diario cronologico con ricerca, ordinamento e bozze.
 - Intensità percepita (scala soggettiva 1–5), contesto, note e ipotesi dichiarate come tali.
-- Password locale, chiave di recupero e cifratura AES-GCM di episodi e registrazioni nell'archivio del browser.
+- Account online con email/password, verifica email via codice OTP e recupero password via email.
+- Diario e registrazioni audio sincronizzati per account; i dati cloud sono isolati tramite `user_id`, Row-Level Security PostgreSQL e bucket audio privato.
+- Modalità locale indipendente con profili separati, password, chiave di recupero e cifratura AES-GCM di episodi e registrazioni.
 - Backup locale versionato, cifrato con la password richiesta all'esportazione, con episodi e registrazioni audio; importazione additiva con gestione dei conflitti.
-- Registrazioni audio esplicitamente avviate dall'utente e salvate localmente in IndexedDB.
+- Registrazioni audio esplicitamente avviate dall'utente e salvate nel profilo locale o sincronizzate nell'account attivo.
 - Contenuti guida pilota per documentare episodi di rumore senza trasformare osservazioni o ipotesi in accertamenti.
 
-**Limiti attuali:** l'applicazione non genera fascicoli, comunicazioni o PDF e non supporta allegati immagine. La cancellazione completa rimuove i dati gestiti dall'app nell'origine del browser corrente, ma non è una cancellazione sicura dei supporti e non elimina backup esportati, file scaricati o copie/sincronizzazioni del profilo browser. Il recupero è affidato a una chiave generata localmente, non a un account online o al maintainer: senza password e chiave di recupero i dati non sono recuperabili. I backup cifrati restano copie indipendenti.
+**Limiti attuali:** l'applicazione non genera fascicoli, comunicazioni o PDF e non supporta allegati immagine. I dati dell'account sono conservati nel cloud e non sono cifrati end-to-end dall'app; l'accesso è limitato all'account dalle policy RLS, mentre password, sessioni e recupero sono gestiti da Neon Auth. I dati dei profili locali sono cifrati nel browser. Backup esportati, file scaricati e copie locali non vengono eliminati cancellando un account o un diario cloud.
 
 ## Cosa non è
 
@@ -51,15 +53,21 @@ Distingui sempre:
 Le guide sono organizzative e globali salvo diversa indicazione esplicita. Una procedura italiana non va generalizzata ad altri Paesi.
 La sola sezione globale è [`jurisdictions/global/`](./jurisdictions/global/README.md); non sono ancora pubblicate guide nazionali verificate.
 
-## Creare e gestire un caso nell'app
+## Account online e credenziali
 
-Al primo avvio, crea una password locale di almeno 12 caratteri e conserva la chiave di recupero mostrata dall'app in un luogo sicuro separato. Se dimentichi la password, dalla schermata di accesso puoi usare la chiave per impostarne una nuova; il recupero genera una chiave sostitutiva da conservare. Scegli **Nuovo episodio** per annotare osservazioni e ipotesi; usa **Esporta backup cifrato** per salvare episodi e registrazioni audio in un file `.ndbackup`. Per importarlo, inserisci la password usata per creare quel backup: il file viene decifrato e validato solo nel browser. L'importazione è additiva; gli episodi con ID in conflitto richiedono una scelta esplicita e i file audio locali non vengono eliminati. Il ripristino sostitutivo, se avviato esplicitamente, conferma la rimozione dei dati locali non presenti nel backup. **Blocca** cancella i dati decifrati dalla vista corrente. Consulta [la guida a cifratura e importazione locale](./docs/local-encrypted-import.md) prima di inserire dati reali.
+Per usare la sincronizzazione, crea un account con email e password (almeno 12 caratteri), verifica l'indirizzo con il codice OTP ricevuto via email e accedi. Per una password dimenticata usa **Password dimenticata?**: Neon Auth invia un codice OTP e revoca le sessioni quando la password viene reimpostata. L'app non salva la password in chiaro; email, password e sessioni sono gestite da Neon Auth. Al momento è configurato il mittente email condiviso di Neon: prima di un uso pubblico va configurato e verificato un provider SMTP dedicato nel pannello Neon.
 
-Un episodio può essere corretto indicando un motivo, conservato insieme alla versione precedente nella cronologia locale cifrata. Puoi anche eliminare un singolo episodio dopo una conferma: l'app rimuove dalla IndexedDB di questo browser l'episodio e le registrazioni audio associate. Questa eliminazione non garantisce la rimozione da backup, sincronizzazioni del profilo o altri dispositivi.
+Gli episodi cloud sono righe PostgreSQL con `user_id` assegnato dall'identità autenticata. Le policy Row-Level Security consentono a ciascun account di leggere e modificare solo i propri dati. Gli audio sono in un bucket Object Storage privato con chiavi prefissate dall'ID account; una Neon Function verifica il JWT e rilascia URL firmati a breve durata. Le credenziali S3 restano nella Function e non sono incluse nel bundle pubblico della PWA. La cancellazione del diario cloud elimina episodi e audio dell'account, non backup esportati o copie locali.
 
-Non esistono account online, sincronizzazione o pannello Keycloak. Il recupero locale tramite chiave consente di impostare una nuova password senza perdere i dati, ma non offre accesso amministrativo al maintainer. Proteggi la chiave di recupero e il backup: senza password né chiave non è possibile decifrare il diario. Un backup esportato non si aggiorna quando il diario cambia.
+## Diario locale e trasferimento dei dati precedenti
 
-Per rimuovere i dati gestiti dall'app su questo browser, sblocca il diario, chiudi le altre schede dell'app e scegli **Elimina diario locale**. Digita `ELIMINA` per confermare. L'app chiude e rimuove l'archivio IndexedDB (episodi e audio), i vecchi dati locali e la configurazione della chiave; la schermata torna alla configurazione iniziale. Il flusso è stato verificato localmente end-to-end con un episodio e una registrazione sintetici, ripristinati da backup cifrato in un'origine browser pulita. L'operazione non elimina copie esportate, file recuperati/scaricati, altri profili o dispositivi, né garantisce la sovrascrittura fisica dei supporti; i browser possono conservare backup o copie sincronizzate. Salva prima un backup cifrato se vuoi mantenere una copia recuperabile.
+Il diario precedente resta nel browser e non viene trasferito o cancellato automaticamente. Per migrarlo nell'account, apri la modalità locale, sblocca il profilo storico, crea un **backup cifrato**, poi accedi all'account e importalo usando la password del backup. Puoi scegliere importazione additiva o ripristino sostitutivo dopo una conferma esplicita. Il backup resta una copia indipendente.
+
+La modalità locale usa profili distinti nello stesso browser con password, chiave di recupero e cifratura AES-GCM; non è un account e non sincronizza dispositivi. Senza password o chiave di recupero i dati locali non sono decifrabili. Consulta [la guida a cifratura e importazione locale](./docs/local-encrypted-import.md).
+
+Un episodio può essere corretto indicando un motivo, conservato insieme alla versione precedente. L'eliminazione dal diario online rimuove i dati sincronizzati dell'account; quella locale rimuove solo il profilo attivo in questo browser. Nessuna delle due elimina backup, file scaricati o copie di altri dispositivi.
+
+Il codice di questa integrazione è nel repository; il sito GitHub Pages non viene aggiornato automaticamente finché la modifica non è pubblicata su `main` e il workflow Pages non termina con successo.
 
 La generazione di lettere, PDF, ZIP o fascicoli non è attualmente disponibile nell'app. I modelli in `situations/noise/documents/` sono documenti di testo da copiare, verificare e personalizzare separatamente; l'indice editoriale viene rigenerato con `npm run content:check -- --write-index`.
 
@@ -80,6 +88,8 @@ La generazione di lettere, PDF, ZIP o fascicoli non è attualmente disponibile n
 Il codice è rilasciato con licenza MIT; la documentazione e i contenuti editoriali sono rilasciati con licenza Creative Commons Attribution 4.0 International (CC BY 4.0). I contributori mantengono il copyright delle proprie opere e autorizzano l'uso secondo la licenza pertinente. Vedi [`LICENSE`](./LICENSE) e [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Roadmap
+
+L'evoluzione NOYSE parte dall'[analisi del repository e backlog prioritizzato](./docs/NOYSE_EVOLUTION.md), aggiornati al working tree del 2026-11-10. Il documento distingue implementazioni locali, requisiti futuri e verifiche cloud ancora necessarie.
 
 La roadmap completa e il prossimo singolo passo sono in [ROADMAP.md](./ROADMAP.md). Il primo incremento introduce il caso pilota noise e il processo editoriale; non implementa ancora generazione/esportazione completa dei fascicoli.
 
@@ -103,4 +113,4 @@ Il workflow pull request non richiede segreti, non carica file degli utenti e va
 
 ## Responsabilità e privacy
 
-Prima di pubblicare, leggi [DISCLAIMER.md](./DISCLAIMER.md), [PRIVACY.md](./PRIVACY.md) e le [politiche di revisione e verifica](./docs/content-review-policy.md). Contenuti pubblici devono essere sintetici o anonimizzati; non pubblicare casi o allegati reali. I dati importati o registrati restano nel browser dell'utente, non fanno parte del bundle GitHub Pages e non vengono inviati ai workflow. La cifratura locale non sostituisce un account o un servizio di sincronizzazione autenticato.
+Prima di pubblicare, leggi [DISCLAIMER.md](./DISCLAIMER.md), [PRIVACY.md](./PRIVACY.md) e le [politiche di revisione e verifica](./docs/content-review-policy.md). Contenuti pubblici devono essere sintetici o anonimizzati; non pubblicare casi o allegati reali. In modalita' locale i dati restano nel browser; in modalita' account eventi e audio vengono sincronizzati nei servizi cloud configurati e non sono cifrati end-to-end dall'app. I dati del diario non fanno parte del bundle GitHub Pages e non vengono inviati ai workflow. La cifratura locale non sostituisce un account o un servizio di sincronizzazione autenticato.

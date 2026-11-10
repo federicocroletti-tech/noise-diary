@@ -82,7 +82,9 @@ button {
   border-radius: 999px;
   padding: 0.72rem 1.15rem;
   cursor: pointer;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
 }
 
 button:hover {
@@ -135,6 +137,17 @@ button.secondary {
 .privacy-note {
   color: var(--muted);
   line-height: 1.6;
+}
+
+.profile-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.profile-button {
+  width: 100%;
+  text-align: left;
 }
 
 .auth-form {
@@ -307,7 +320,9 @@ small {
   padding: 14px 16px;
   background: rgba(15, 23, 42, 0.55);
   cursor: pointer;
-  transition: border-color 0.2s ease, transform 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease;
 }
 
 .event-list li:hover,

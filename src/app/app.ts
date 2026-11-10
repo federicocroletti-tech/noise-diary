@@ -20,10 +20,24 @@ import {
   PERCEIVED_EFFECTS,
 } from './domain/noise-event.model';
 import { LocalBackupService } from './services/local-backup.service';
+import { LocalDiaryProfile, LocalProfileService } from './services/local-profile.service';
+import { AccountUser, NeonAuthService } from './services/neon-auth.service';
+import { NeonAudioRepository } from './services/neon-audio.repository';
+import { NeonDiaryService } from './services/neon-diary.service';
 
 type SortMode = 'recent' | 'intensity' | 'room';
 type DiaryView = 'list' | 'form' | 'detail';
 type ImportChoice = 'keep-current' | 'use-file';
+type AuthMode = 'loading' | 'profiles' | 'setup' | 'locked' | 'unavailable' | 'unlocked';
+type AccountMode =
+  | 'loading'
+  | 'login'
+  | 'signup'
+  | 'verify-email'
+  | 'forgot-password'
+  | 'reset-password'
+  | 'signed-in'
+  | 'local';
 const MAX_BACKUP_FILE_SIZE = 120 * 1024 * 1024;
 
 interface ImportConflict {
@@ -99,10 +113,26 @@ const EMPTY_DRAFT: NoiseEventDraft = {
   styleUrl: './app.scss',
 })
 export class App implements OnDestroy {
+  private diaryRevision = 0;
+  private audioRequestId = 0;
+
   protected readonly title = signal('Diario Rumore');
-  protected readonly authMode = signal<'loading' | 'setup' | 'locked' | 'unavailable' | 'unlocked'>(
-    'loading',
+  protected readonly authMode = signal<AuthMode>('loading');
+  protected readonly accountMode = signal<AccountMode>('loading');
+  protected readonly accountUser = signal<AccountUser | null>(null);
+  protected readonly diaryOpen = computed(
+    () => this.accountMode() === 'signed-in' || (this.accountMode() === 'local' && this.authMode() === 'unlocked'),
   );
+  protected readonly accountEmailInput = signal('');
+  protected readonly accountPasswordInput = signal('');
+  protected readonly accountPasswordConfirmation = signal('');
+  protected readonly accountOtpInput = signal('');
+  protected readonly accountError = signal('');
+  protected readonly accountStatus = signal('');
+  protected readonly accountBusy = signal(false);
+  protected readonly profiles = signal<LocalDiaryProfile[]>([]);
+  protected readonly activeProfile = signal<LocalDiaryProfile | null>(null);
+  protected readonly profileNameInput = signal('');
   protected readonly passwordInput = signal('');
   protected readonly passwordConfirmation = signal('');
   protected readonly recoveryKeyInput = signal('');
@@ -245,14 +275,280 @@ export class App implements OnDestroy {
     private readonly audioClipRepository: AudioClipRepository,
     private readonly vault: LocalVaultService,
     private readonly backupService: LocalBackupService,
+    private readonly profileService: LocalProfileService,
+    private readonly accountService: NeonAuthService,
+    private readonly neonDiary: NeonDiaryService,
+    private readonly neonAudioRepository: NeonAudioRepository,
   ) {
     void this.initialize();
+  }
+
+  protected setAccountMode(mode: AccountMode): void {
+    if (this.accountBusy()) {
+      return;
+    }
+    this.accountError.set('');
+    this.accountStatus.set('');
+    this.accountOtpInput.set('');
+    this.accountPasswordInput.set('');
+    this.accountPasswordConfirmation.set('');
+    this.accountMode.set(mode);
+  }
+
+  protected async submitAccountSignIn(): Promise<void> {
+    this.accountError.set('');
+    this.accountStatus.set('');
+    this.accountBusy.set(true);
+    try {
+      const user = await this.accountService.signIn(
+        this.accountEmailInput().trim(),
+        this.accountPasswordInput(),
+      );
+      await this.activateAccount(user);
+      this.accountPasswordInput.set('');
+    } catch (error) {
+      this.accountError.set(
+        error instanceof Error ? error.message : 'Accesso non riuscito. Verifica email e password.',
+      );
+    } finally {
+      this.accountBusy.set(false);
+    }
+  }
+
+  protected async submitAccountSignUp(): Promise<void> {
+    this.accountError.set('');
+    this.accountStatus.set('');
+    const email = this.accountEmailInput().trim();
+    const password = this.accountPasswordInput();
+    if (password !== this.accountPasswordConfirmation()) {
+      this.accountError.set('Le password non coincidono.');
+      return;
+    }
+
+    this.accountBusy.set(true);
+    try {
+      await this.accountService.signUp(email, password);
+      this.accountMode.set('verify-email');
+      this.accountOtpInput.set('');
+      this.accountPasswordInput.set('');
+      this.accountPasswordConfirmation.set('');
+      this.accountStatus.set('Ti abbiamo inviato un codice email per verificare l’account.');
+    } catch (error) {
+      this.accountError.set(
+        error instanceof Error ? error.message : 'Impossibile creare l’account.',
+      );
+    } finally {
+      this.accountBusy.set(false);
+    }
+  }
+
+  protected async verifyAccountEmail(): Promise<void> {
+    this.accountError.set('');
+    this.accountStatus.set('');
+    this.accountBusy.set(true);
+    try {
+      const email = this.accountEmailInput().trim();
+      await this.accountService.verifyEmail(email, this.accountOtpInput().trim());
+      const user = await this.accountService.getCurrentUser();
+      if (user?.emailVerified) {
+        await this.activateAccount(user);
+      } else {
+        this.accountMode.set('login');
+        this.accountStatus.set('Email verificata. Accedi con la tua password.');
+      }
+    } catch (error) {
+      this.accountError.set(
+        error instanceof Error ? error.message : 'Il codice email non è valido o è scaduto.',
+      );
+    } finally {
+      this.accountBusy.set(false);
+    }
+  }
+
+  protected async resendVerificationOtp(): Promise<void> {
+    this.accountError.set('');
+    this.accountStatus.set('');
+    this.accountBusy.set(true);
+    try {
+      await this.accountService.sendVerificationOtp(this.accountEmailInput().trim());
+      this.accountStatus.set('Un nuovo codice di verifica è stato inviato.');
+    } catch (error) {
+      this.accountError.set(
+        error instanceof Error ? error.message : 'Impossibile inviare il codice di verifica.',
+      );
+    } finally {
+      this.accountBusy.set(false);
+    }
+  }
+
+  protected async requestAccountPasswordReset(): Promise<void> {
+    this.accountError.set('');
+    this.accountStatus.set('');
+    this.accountBusy.set(true);
+    try {
+      await this.accountService.requestPasswordReset(this.accountEmailInput().trim());
+      this.accountMode.set('reset-password');
+      this.accountOtpInput.set('');
+      this.accountStatus.set('Se l’account esiste, riceverai un codice per reimpostare la password.');
+    } catch (error) {
+      this.accountError.set(
+        error instanceof Error ? error.message : 'Impossibile richiedere il recupero password.',
+      );
+    } finally {
+      this.accountBusy.set(false);
+    }
+  }
+
+  protected async resetAccountPassword(): Promise<void> {
+    this.accountError.set('');
+    this.accountStatus.set('');
+    const password = this.accountPasswordInput();
+    if (password.length < 12) {
+      this.accountError.set('La nuova password deve contenere almeno 12 caratteri.');
+      return;
+    }
+    if (password !== this.accountPasswordConfirmation()) {
+      this.accountError.set('Le password non coincidono.');
+      return;
+    }
+
+    this.accountBusy.set(true);
+    try {
+      await this.accountService.resetPassword(
+        this.accountEmailInput().trim(),
+        this.accountOtpInput().trim(),
+        password,
+      );
+      this.accountPasswordInput.set('');
+      this.accountPasswordConfirmation.set('');
+      this.accountOtpInput.set('');
+      this.accountMode.set('login');
+      this.accountStatus.set('Password aggiornata. Accedi con la nuova password.');
+    } catch (error) {
+      this.accountError.set(
+        error instanceof Error ? error.message : 'Impossibile reimpostare la password.',
+      );
+    } finally {
+      this.accountBusy.set(false);
+    }
+  }
+
+  protected async signOutAccount(): Promise<void> {
+    if (this.accountBusy() || this.recordingActive()) {
+      return;
+    }
+    this.accountBusy.set(true);
+    try {
+      await this.accountService.signOut();
+      this.audioRecordingService.useSaveHandler();
+      this.accountUser.set(null);
+      this.clearPrivateDiary();
+      this.authMode.set('loading');
+      this.accountMode.set('login');
+      this.accountStatus.set('Hai terminato la sessione.');
+    } catch (error) {
+      this.accountError.set(
+        error instanceof Error ? error.message : 'Impossibile terminare la sessione.',
+      );
+    } finally {
+      this.accountBusy.set(false);
+    }
+  }
+
+  protected async openLocalDiary(): Promise<void> {
+    if (this.accountBusy() || this.recordingActive()) {
+      return;
+    }
+    this.clearPrivateDiary();
+    this.accountMode.set('local');
+    this.accountError.set('');
+    this.accountStatus.set('');
+    await this.initializeLocalProfiles();
+  }
+
+  protected async returnToAccount(): Promise<void> {
+    if (this.accountBusy() || this.recordingActive()) {
+      return;
+    }
+    this.vault.lock();
+    this.storageService.close();
+    this.audioClipRepository.close();
+    this.clearPrivateDiary();
+    this.activeProfile.set(null);
+    this.authMode.set('loading');
+    this.accountMode.set('loading');
+    this.accountError.set('');
+    const revision = this.diaryRevision;
+    try {
+      const user = await this.accountService.getCurrentUser();
+      if (revision !== this.diaryRevision) {
+        return;
+      }
+      if (user?.emailVerified) {
+        await this.activateAccount(user);
+      } else {
+        this.accountMode.set('login');
+      }
+    } catch (error) {
+      if (revision !== this.diaryRevision) {
+        return;
+      }
+      this.accountMode.set('login');
+      this.accountError.set(
+        error instanceof Error ? error.message : 'Impossibile verificare la sessione account.',
+      );
+    }
   }
 
   ngOnDestroy(): void {
     this.audioRecordingService.cancel();
     this.vault.lock();
-    this.revokeAudioUrls();
+    this.storageService.close();
+    this.audioClipRepository.close();
+    this.clearPrivateDiary();
+  }
+
+  protected createProfile(): void {
+    this.authError.set('');
+    try {
+      const profile = this.profileService.createProfile(this.profileNameInput());
+      this.profiles.set(this.profileService.listProfiles());
+      this.profileNameInput.set('');
+      this.activateProfile(profile);
+    } catch (error) {
+      this.authError.set(
+        error instanceof Error ? error.message : 'Impossibile creare il profilo locale.',
+      );
+    }
+  }
+
+  protected selectProfile(profile: LocalDiaryProfile): void {
+    this.activateProfile(profile);
+  }
+
+  protected async showProfiles(): Promise<void> {
+    if (this.authBusy() || this.recordingActive()) {
+      return;
+    }
+    this.accountMode.set('local');
+    this.audioRecordingService.useSaveHandler();
+    this.vault.lock();
+    this.storageService.close();
+    this.audioClipRepository.close();
+    this.clearPrivateDiary();
+    this.activeProfile.set(null);
+    this.authError.set('');
+    this.passwordInput.set('');
+    this.passwordConfirmation.set('');
+    try {
+      this.profiles.set(this.profileService.listProfiles());
+      this.authMode.set('profiles');
+    } catch (error) {
+      this.authMode.set('unavailable');
+      this.authError.set(
+        error instanceof Error ? error.message : 'Impossibile leggere i profili locali.',
+      );
+    }
   }
 
   protected async submitVaultAccess(): Promise<void> {
@@ -281,7 +577,9 @@ export class App implements OnDestroy {
       } else {
         generatedRecoveryKey = await this.vault.unlock(password);
       }
-      await this.loadPrivateDiary();
+      if (!(await this.loadPrivateDiary())) {
+        return;
+      }
       this.authMode.set('unlocked');
       if (generatedRecoveryKey) {
         this.presentRecoveryKey(generatedRecoveryKey);
@@ -317,7 +615,9 @@ export class App implements OnDestroy {
     this.authBusy.set(true);
     try {
       const newRecoveryKey = await this.vault.recover(this.recoveryKeyInput(), newPassword);
-      await this.loadPrivateDiary();
+      if (!(await this.loadPrivateDiary())) {
+        return;
+      }
       this.authMode.set('unlocked');
       this.recoveryMode.set(false);
       this.recoveryKeyInput.set('');
@@ -427,9 +727,12 @@ export class App implements OnDestroy {
       return;
     }
 
+    const cloudAccount = this.accountMode() === 'signed-in';
     const confirmation = window.prompt(
-      'Questa operazione elimina episodi, registrazioni, chiave locale e dati legacy da questo browser. ' +
-        'Non elimina backup esportati, file scaricati o copie di altri dispositivi. ' +
+      cloudAccount
+        ? 'Questa operazione elimina in modo permanente tutti gli episodi e gli audio dell’account da tutti i dispositivi. I backup esportati non verranno eliminati. Digita ELIMINA per confermare.'
+        : `Questa operazione elimina episodi, registrazioni e chiave del profilo "${this.activeProfile()?.name ?? ''}" da questo browser. ` +
+            'Non elimina backup esportati, file scaricati o copie di altri dispositivi. ' +
         'Chiudi le altre schede del diario, poi digita ELIMINA per confermare.',
     );
     if (confirmation !== 'ELIMINA') {
@@ -444,19 +747,40 @@ export class App implements OnDestroy {
     this.audioStatus.set('');
     this.importStatus.set('');
     try {
+      if (cloudAccount) {
+        await this.neonDiary.deleteAll();
+        this.clearPrivateDiary();
+        this.authMode.set('unlocked');
+        this.storageError.set('');
+        this.importStatus.set('Tutti gli episodi e gli audio dell’account sono stati eliminati.');
+        return;
+      }
       this.audioClipRepository.close();
       await this.storageService.deleteAllLocalData(() =>
         this.storageError.set(
           'Cancellazione in attesa: chiudi le altre schede del diario per completarla.',
         ),
       );
+      const profile = this.activeProfile();
       this.vault.deleteConfiguration();
       this.clearPrivateDiary();
-      this.authMode.set('setup');
+      this.activeProfile.set(null);
+      if (profile && !profile.legacy) {
+        this.profileService.deleteProfile(profile.id);
+      }
+      this.profiles.set(this.profileService.listProfiles());
+      this.authMode.set('profiles');
       this.passwordInput.set('');
       this.passwordConfirmation.set('');
-      this.authStatus.set('Diario locale cancellato da questo browser.');
+      this.authStatus.set('I dati del profilo sono stati eliminati da questo browser.');
     } catch (error) {
+      this.vault.lock();
+      this.clearPrivateDiary();
+      try {
+        this.authMode.set(this.vault.isConfigured() ? 'locked' : 'unavailable');
+      } catch {
+        this.authMode.set('unavailable');
+      }
       this.storageError.set(
         error instanceof Error ? error.message : 'Impossibile cancellare il diario locale.',
       );
@@ -494,16 +818,14 @@ export class App implements OnDestroy {
       let importedClips: AudioClip[] = [];
       if (this.backupService.isEncryptedEnvelope(contents)) {
         const password = window.prompt(
-          'Inserisci la password principale usata per cifrare questo backup.',
+          'Inserisci la passphrase o password usata per cifrare questo backup.',
         );
         if (password === null) {
           this.importStatus.set('Importazione annullata; nessun episodio è stato modificato.');
           return;
         }
         const backup = await this.backupService.decrypt(contents, password);
-        importedEvents = backup.events.length
-          ? this.storageService.parseImport(backup.events)
-          : [];
+        importedEvents = backup.events.length ? this.storageService.parseImport(backup.events) : [];
         importedClips = backup.audioClips;
       } else {
         if (
@@ -525,7 +847,7 @@ export class App implements OnDestroy {
         ) {
           return;
         }
-        await this.storageService.saveEventsAndClips(importedEvents, importedClips, true);
+        await this.saveEventsAndClipsForActiveDiary(importedEvents, importedClips, true);
         this.events.set(importedEvents);
         this.selectedEventId.set(importedEvents[0]?.id ?? null);
         this.activeView.set('list');
@@ -561,8 +883,15 @@ export class App implements OnDestroy {
       }
 
       if (conflicts.length > 0) {
-        this.pendingAppendImport.set({ additions, conflicts, duplicateCount, audioClips: importedClips });
-        this.importStatus.set('Rivedi gli episodi con lo stesso ID prima di completare l’importazione.');
+        this.pendingAppendImport.set({
+          additions,
+          conflicts,
+          duplicateCount,
+          audioClips: importedClips,
+        });
+        this.importStatus.set(
+          'Rivedi gli episodi con lo stesso ID prima di completare l’importazione.',
+        );
         return;
       }
       await this.applyAppendImport(additions, [], duplicateCount, importedClips);
@@ -628,10 +957,12 @@ export class App implements OnDestroy {
     }
     const mergedEvents = [...mergedById.values()];
     const retainedEventIds = new Set(
-      conflicts.filter((conflict) => conflict.choice === 'keep-current').map((conflict) => conflict.current.id),
+      conflicts
+        .filter((conflict) => conflict.choice === 'keep-current')
+        .map((conflict) => conflict.current.id),
     );
     const acceptedClips = audioClips.filter((clip) => !retainedEventIds.has(clip.eventId));
-    const existingClips = await this.audioClipRepository.getByIds(
+    const existingClips = await this.getClipsByIds(
       acceptedClips.map((clip) => clip.id),
     );
     const existingById = new Map(existingClips.map((clip) => [clip.id, clip]));
@@ -651,12 +982,13 @@ export class App implements OnDestroy {
       }
     }
     if (clipsToSave.length > 0) {
-      await this.storageService.saveEventsAndClips(mergedEvents, clipsToSave);
+      await this.saveEventsAndClipsForActiveDiary(mergedEvents, clipsToSave);
     } else {
-      await this.storageService.saveEvents(mergedEvents);
+      await this.saveEventsForActiveDiary(mergedEvents);
     }
     this.events.set(mergedEvents);
-    const importedCount = additions.length + conflicts.filter((item) => item.choice === 'use-file').length;
+    const importedCount =
+      additions.length + conflicts.filter((item) => item.choice === 'use-file').length;
     const nextSelectedId =
       additions[0]?.id ??
       conflicts.find((item) => item.choice === 'use-file')?.incoming.id ??
@@ -666,7 +998,8 @@ export class App implements OnDestroy {
       await this.loadAudioForEvent(nextSelectedId);
     }
     this.activeView.set('list');
-    const duplicateSummary = duplicateCount + conflicts.filter((item) => item.choice === 'keep-current').length;
+    const duplicateSummary =
+      duplicateCount + conflicts.filter((item) => item.choice === 'keep-current').length;
     const importedMessage =
       importedCount === 1
         ? 'Aggiunto o aggiornato 1 episodio'
@@ -748,7 +1081,11 @@ export class App implements OnDestroy {
 
     this.storageError.set('');
     try {
-      await this.storageService.deleteEvent(event.id);
+      if (this.accountMode() === 'signed-in') {
+        await this.neonDiary.deleteEvent(event.id);
+      } else {
+        await this.storageService.deleteEvent(event.id);
+      }
       const updatedEvents = this.events().filter((item) => item.id !== event.id);
       this.events.set(updatedEvents);
       this.importStatus.set(
@@ -768,7 +1105,9 @@ export class App implements OnDestroy {
       }
     } catch (error) {
       this.storageError.set(
-        error instanceof Error ? error.message : 'Impossibile eliminare l’episodio dal dispositivo.',
+        error instanceof Error
+          ? error.message
+          : 'Impossibile eliminare l’episodio dal dispositivo.',
       );
     }
   }
@@ -784,7 +1123,10 @@ export class App implements OnDestroy {
     }
   }
 
-  protected onFieldChange<K extends keyof NoiseEventDraft>(field: K, value: NoiseEventDraft[K]): void {
+  protected onFieldChange<K extends keyof NoiseEventDraft>(
+    field: K,
+    value: NoiseEventDraft[K],
+  ): void {
     this.draft.update((current) => ({ ...current, [field]: value }));
   }
 
@@ -901,7 +1243,7 @@ export class App implements OnDestroy {
     }
 
     try {
-      await this.storageService.saveEvents(events);
+      await this.saveEventsForActiveDiary(events);
       this.events.set(events);
       this.selectedEventId.set(event.id);
       this.draft.set({ ...EMPTY_DRAFT, startedAt: currentLocalDateTime() });
@@ -975,7 +1317,9 @@ export class App implements OnDestroy {
   protected pauseAudioRecording(): void {
     this.audioRecordingService.pause();
     this.recordingPaused.set(this.audioRecordingService.isPaused);
-    this.audioStatus.set(this.recordingPaused() ? 'Registrazione in pausa.' : 'Pausa non supportata.');
+    this.audioStatus.set(
+      this.recordingPaused() ? 'Registrazione in pausa.' : 'Pausa non supportata.',
+    );
   }
 
   protected resumeAudioRecording(): void {
@@ -989,7 +1333,11 @@ export class App implements OnDestroy {
       const clip = await this.audioRecordingService.stop();
       await this.addClipToEvent(clip);
       await this.loadAudioForEvent(clip.eventId);
-      this.audioStatus.set('Registrazione salvata solo su questo dispositivo.');
+      this.audioStatus.set(
+        this.accountMode() === 'signed-in'
+          ? 'Registrazione caricata e associata al tuo account.'
+          : 'Registrazione salvata solo su questo dispositivo.',
+      );
     } catch (error) {
       this.audioError.set(formatRecordingError(error));
     } finally {
@@ -1000,12 +1348,16 @@ export class App implements OnDestroy {
   }
 
   protected async deleteAudioClip(clip: AudioClip): Promise<void> {
-    if (!confirm(`Eliminare definitivamente la registrazione "${clip.fileName}" da questo dispositivo?`)) {
+    if (
+      !confirm(
+        `Eliminare definitivamente la registrazione "${clip.fileName}" da questo dispositivo?`,
+      )
+    ) {
       return;
     }
 
     try {
-      await this.audioClipRepository.delete(clip.id);
+      await this.deleteClip(clip.id);
       const event = this.events().find((item) => item.id === clip.eventId);
       if (event) {
         const updatedEvent = {
@@ -1018,7 +1370,7 @@ export class App implements OnDestroy {
         const updatedEvents = this.events().map((item) =>
           item.id === updatedEvent.id ? updatedEvent : item,
         );
-        await this.storageService.saveEvents(updatedEvents);
+        await this.saveEventsForActiveDiary(updatedEvents);
         this.events.set(updatedEvents);
       }
       this.revokeAudioUrl(clip.id);
@@ -1052,26 +1404,54 @@ export class App implements OnDestroy {
   }
 
   protected async downloadExport(): Promise<void> {
-    if (this.authMode() !== 'unlocked') {
-      return;
-    }
-    const password = window.prompt('Inserisci la password principale per cifrare il backup.');
-    if (password === null) {
+    if (!this.diaryOpen() || this.authMode() !== 'unlocked') {
       return;
     }
     this.storageError.set('');
+    this.importStatus.set('');
+    const source = this.accountMode() === 'signed-in' ? 'account' : 'local';
+    const password = window.prompt(
+      source === 'account'
+        ? 'Scegli una passphrase di almeno 12 caratteri per questo backup. Non è la password dell’account. Conservala: sarà necessaria per importare il file.'
+        : 'Inserisci la password principale per cifrare il backup.',
+    );
+    if (password === null) {
+      return;
+    }
+    if (source === 'account') {
+      if (password.length < 12) {
+        this.storageError.set('La passphrase del backup deve contenere almeno 12 caratteri.');
+        return;
+      }
+      const confirmation = window.prompt('Conferma la passphrase del backup.');
+      if (confirmation === null) {
+        return;
+      }
+      if (password !== confirmation) {
+        this.storageError.set('Le passphrase del backup non coincidono.');
+        return;
+      }
+    }
+    const events = this.events();
+    const revision = this.diaryRevision;
     try {
       const audioClips = (
         await Promise.all(
-          this.events().map((diaryEvent) =>
-            this.audioClipRepository.listByEvent(diaryEvent.id),
-          ),
+          events.map((diaryEvent) => this.listClipsByEvent(diaryEvent.id)),
         )
       ).flat();
-      const serialized = await this.backupService.encrypt(this.events(), audioClips, password);
+      if (revision !== this.diaryRevision || !this.diaryOpen()) {
+        return;
+      }
+      const serialized = await this.backupService.encrypt(events, audioClips, password, source);
+      if (revision !== this.diaryRevision || !this.diaryOpen()) {
+        return;
+      }
       const blob = new Blob([serialized], { type: 'application/json' });
       if (blob.size > MAX_BACKUP_FILE_SIZE) {
-        throw new Error('Il backup supera il limite di 120 MiB e non può essere esportato in un unico file.');
+        throw new Error(
+          'Il backup supera il limite di 120 MiB e non può essere esportato in un unico file.',
+        );
       }
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
@@ -1080,9 +1460,12 @@ export class App implements OnDestroy {
       anchor.click();
       URL.revokeObjectURL(url);
       this.importStatus.set(
-        `Backup cifrato creato con ${this.events().length} episodi e ${audioClips.length} registrazioni audio.`,
+        `Backup cifrato creato con ${events.length} episodi e ${audioClips.length} registrazioni audio.`,
       );
     } catch (error) {
+      if (revision !== this.diaryRevision) {
+        return;
+      }
       this.storageError.set(
         error instanceof Error ? error.message : 'Impossibile creare il backup cifrato.',
       );
@@ -1090,33 +1473,143 @@ export class App implements OnDestroy {
   }
 
   private async initialize(): Promise<void> {
+    const revision = this.diaryRevision;
     try {
-      this.authMode.set(this.vault.isConfigured() ? 'locked' : 'setup');
+      const user = await this.accountService.getCurrentUser();
+      if (revision !== this.diaryRevision) {
+        return;
+      }
+      if (user?.emailVerified) {
+        await this.activateAccount(user);
+      } else {
+        this.accountMode.set('login');
+        this.authMode.set('loading');
+      }
     } catch (error) {
-      this.authMode.set('unavailable');
-      this.authError.set(
-        error instanceof Error ? error.message : 'Impossibile leggere la configurazione del diario.',
+      if (revision !== this.diaryRevision) {
+        return;
+      }
+      this.accountMode.set('login');
+      this.authMode.set('loading');
+      this.accountError.set(
+        error instanceof Error ? error.message : 'Impossibile verificare la sessione account.',
       );
     }
   }
 
-  private async loadPrivateDiary(): Promise<void> {
+  private async initializeLocalProfiles(): Promise<void> {
+    try {
+      const profiles = this.profileService.listProfiles();
+      this.profiles.set(profiles);
+      if (profiles.length === 1) {
+        this.activateProfile(profiles[0]);
+      } else {
+        this.authMode.set('profiles');
+      }
+    } catch (error) {
+      this.authMode.set('unavailable');
+      this.authError.set(
+        error instanceof Error
+          ? error.message
+          : 'Impossibile leggere la configurazione del diario.',
+      );
+    }
+  }
+
+  private async activateAccount(user: AccountUser): Promise<void> {
+    this.clearPrivateDiary();
+    if (!user.emailVerified) {
+      this.accountEmailInput.set(user.email);
+      this.accountOtpInput.set('');
+      this.accountMode.set('verify-email');
+      this.accountStatus.set('Verifica l’indirizzo email prima di accedere al diario.');
+      return;
+    }
+    this.vault.lock();
+    this.storageService.close();
+    this.audioClipRepository.close();
+    this.audioRecordingService.useSaveHandler((clip) => this.neonAudioRepository.save(clip));
+    this.activeProfile.set(null);
+    this.accountUser.set(user);
+    this.accountEmailInput.set(user.email);
+    this.accountPasswordInput.set('');
+    this.accountPasswordConfirmation.set('');
+    this.accountError.set('');
+    this.accountMode.set('signed-in');
+    this.authMode.set('unlocked');
+    const revision = this.diaryRevision;
+    try {
+      await this.loadPrivateDiary();
+    } catch (error) {
+      if (revision === this.diaryRevision) {
+        this.storageError.set(
+          error instanceof Error ? error.message : 'Impossibile caricare il diario dell’account.',
+        );
+      }
+    }
+  }
+
+  private activateProfile(profile: LocalDiaryProfile): void {
+    this.clearPrivateDiary();
+    try {
+      this.accountMode.set('local');
+      this.accountUser.set(null);
+      this.audioRecordingService.useSaveHandler();
+      this.vault.useProfile(profile.id);
+      this.storageService.useProfile(profile.id);
+      this.audioClipRepository.useProfile(profile.id);
+      this.activeProfile.set(profile);
+      this.authError.set('');
+      this.authStatus.set('');
+      this.authMode.set(this.vault.isConfigured() ? 'locked' : 'setup');
+    } catch (error) {
+      this.activeProfile.set(profile);
+      this.authMode.set('unavailable');
+      this.authError.set(
+        error instanceof Error ? error.message : 'Impossibile aprire il profilo locale.',
+      );
+    }
+  }
+
+  private async loadPrivateDiary(): Promise<boolean> {
+    const revision = this.diaryRevision;
+    const cloudAccount = this.accountMode() === 'signed-in';
     this.loadingEvents.set(true);
     try {
-      const initialEvents = await this.storageService.loadEvents();
-      await this.audioClipRepository.encryptLegacyRecords();
+      const initialEvents = cloudAccount
+        ? await this.neonDiary.loadEvents()
+        : await this.storageService.loadEvents();
+      if (revision !== this.diaryRevision) {
+        return false;
+      }
+      if (!cloudAccount) {
+        await this.audioClipRepository.encryptLegacyRecords();
+      }
+      if (revision !== this.diaryRevision) {
+        return false;
+      }
       this.events.set(initialEvents);
       this.selectedEventId.set(initialEvents[0]?.id ?? null);
       this.storageError.set('');
       if (initialEvents[0]) {
         await this.loadAudioForEvent(initialEvents[0].id);
       }
+      return revision === this.diaryRevision;
+    } catch (error) {
+      if (revision !== this.diaryRevision) {
+        return false;
+      }
+      throw error;
     } finally {
-      this.loadingEvents.set(false);
+      if (revision === this.diaryRevision) {
+        this.loadingEvents.set(false);
+      }
     }
   }
 
   private clearPrivateDiary(): void {
+    this.diaryRevision += 1;
+    this.audioRequestId += 1;
     this.revokeAudioUrls();
     this.events.set([]);
     this.audioClips.set([]);
@@ -1136,17 +1629,25 @@ export class App implements OnDestroy {
     this.recoveryPassword.set('');
     this.recoveryPasswordConfirmation.set('');
     this.importStatus.set('');
+    this.audioError.set('');
+    this.audioStatus.set('');
     this.storageError.set('');
     this.authStatus.set('');
     this.loadingEvents.set(false);
   }
 
   private async loadAudioForEvent(eventId: string): Promise<void> {
+    const revision = this.diaryRevision;
+    const requestId = ++this.audioRequestId;
     this.revokeAudioUrls();
     this.audioClips.set([]);
     try {
-      const clips = await this.audioClipRepository.listByEvent(eventId);
-      if (this.selectedEventId() !== eventId) {
+      const clips = await this.listClipsByEvent(eventId);
+      if (
+        revision !== this.diaryRevision ||
+        requestId !== this.audioRequestId ||
+        this.selectedEventId() !== eventId
+      ) {
         return;
       }
       const urls: Record<string, string> = {};
@@ -1156,7 +1657,53 @@ export class App implements OnDestroy {
       this.audioUrls.set(urls);
       this.audioClips.set(clips);
     } catch (error) {
-      this.audioError.set(formatRecordingError(error));
+      if (
+        revision === this.diaryRevision &&
+        requestId === this.audioRequestId &&
+        this.selectedEventId() === eventId
+      ) {
+        this.audioError.set(formatRecordingError(error));
+      }
+    }
+  }
+
+  private async saveEventsForActiveDiary(events: NoiseEvent[]): Promise<void> {
+    if (this.accountMode() === 'signed-in') {
+      await this.neonDiary.saveEvents(events);
+    } else {
+      await this.storageService.saveEvents(events);
+    }
+  }
+
+  private async saveEventsAndClipsForActiveDiary(
+    events: NoiseEvent[],
+    clips: AudioClip[],
+    replaceAudio = false,
+  ): Promise<void> {
+    if (this.accountMode() === 'signed-in') {
+      await this.neonDiary.saveEventsAndClips(events, clips, replaceAudio);
+    } else {
+      await this.storageService.saveEventsAndClips(events, clips, replaceAudio);
+    }
+  }
+
+  private async listClipsByEvent(eventId: string): Promise<AudioClip[]> {
+    return this.accountMode() === 'signed-in'
+      ? this.neonAudioRepository.listByEvent(eventId)
+      : this.audioClipRepository.listByEvent(eventId);
+  }
+
+  private async getClipsByIds(ids: string[]): Promise<AudioClip[]> {
+    return this.accountMode() === 'signed-in'
+      ? this.neonAudioRepository.getByIds(ids)
+      : this.audioClipRepository.getByIds(ids);
+  }
+
+  private async deleteClip(id: string): Promise<void> {
+    if (this.accountMode() === 'signed-in') {
+      await this.neonAudioRepository.delete(id);
+    } else {
+      await this.audioClipRepository.delete(id);
     }
   }
 
@@ -1173,7 +1720,7 @@ export class App implements OnDestroy {
       updatedAt: new Date().toISOString(),
     };
     const updatedEvents = this.events().map((item) => (item.id === event.id ? updatedEvent : item));
-    await this.storageService.saveEvents(updatedEvents);
+    await this.saveEventsForActiveDiary(updatedEvents);
     this.events.set(updatedEvents);
   }
 

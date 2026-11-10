@@ -1,5 +1,7 @@
 # Audit del repository
 
+> Fotografia storica del 2026-11-01. Per lo stato del working tree al 2026-11-10, l'inventario aggiornato e i nuovi problemi verificati, consultare [NOYSE: analisi e piano di evoluzione](./NOYSE_EVOLUTION.md). Le conclusioni seguenti non descrivono tutte le integrazioni cloud aggiunte successivamente.
+
 **Data:** 2026-11-01
 
 **Repository:** `federicocroletti-tech/noise-diary`

@@ -10,6 +10,7 @@ import {
 } from '../domain/noise-event.model';
 import { AudioClip } from '../audio/models/audio-clip.model';
 import { NoiseEventRepository } from './noise-event.repository';
+import { LEGACY_PROFILE_ID } from './local-profile.service';
 
 const LEGACY_STORAGE_KEY = 'noise-diary.events';
 const DEMO_EVENT_IDS = new Set(['evt-101', 'evt-102']);
@@ -23,11 +24,22 @@ const LEGACY_EFFECTS: Record<string, PerceivedEffect> = {
 
 @Injectable({ providedIn: 'root' })
 export class NoiseStorageService {
+  private profileId = LEGACY_PROFILE_ID;
+
   constructor(private readonly repository: NoiseEventRepository) {}
+
+  useProfile(profileId: string): void {
+    this.profileId = profileId;
+    this.repository.useProfile(profileId);
+  }
+
+  close(): void {
+    this.repository.close();
+  }
 
   async loadEvents(): Promise<NoiseEvent[]> {
     const storedEvents = await this.repository.getAll();
-    const legacyEvents = this.readLegacyEvents();
+    const legacyEvents = this.profileId === LEGACY_PROFILE_ID ? this.readLegacyEvents() : [];
     if (legacyEvents.length === 0) {
       storedEvents.forEach((event) => this.validateEvent(event));
       return storedEvents;
@@ -54,7 +66,9 @@ export class NoiseStorageService {
       this.validateEvent(event);
     }
     if (new Set(events.map((event) => event.id)).size !== events.length) {
-      throw new Error('Il diario contiene ID episodio duplicati; i dati non sono stati modificati.');
+      throw new Error(
+        'Il diario contiene ID episodio duplicati; i dati non sono stati modificati.',
+      );
     }
     await this.repository.saveAll(events);
   }
@@ -68,7 +82,9 @@ export class NoiseStorageService {
       this.validateEvent(event);
     }
     if (new Set(events.map((event) => event.id)).size !== events.length) {
-      throw new Error('Il diario contiene ID episodio duplicati; i dati non sono stati modificati.');
+      throw new Error(
+        'Il diario contiene ID episodio duplicati; i dati non sono stati modificati.',
+      );
     }
     await this.repository.saveAllWithAudio(events, clips, replaceAudio);
   }
@@ -79,7 +95,9 @@ export class NoiseStorageService {
 
   async deleteAllLocalData(onBlocked?: () => void): Promise<void> {
     await this.repository.deleteDatabase(onBlocked);
-    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    if (this.profileId === LEGACY_PROFILE_ID) {
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    }
   }
 
   parseImport(value: unknown): NoiseEvent[] {
@@ -123,7 +141,9 @@ export class NoiseStorageService {
     }
 
     if (!Array.isArray(parsed)) {
-      throw new Error('I vecchi dati del diario non hanno il formato previsto; non sono stati modificati.');
+      throw new Error(
+        'I vecchi dati del diario non hanno il formato previsto; non sono stati modificati.',
+      );
     }
     return parsed;
   }
@@ -138,9 +158,7 @@ export class NoiseStorageService {
     return (
       !('attachmentIds' in value) ||
       !Array.isArray(value.attachmentIds) ||
-      value.attachmentIds.every(
-        (id) => typeof id === 'string' && DEMO_ATTACHMENT_IDS.has(id),
-      )
+      value.attachmentIds.every((id) => typeof id === 'string' && DEMO_ATTACHMENT_IDS.has(id))
     );
   }
 
@@ -159,7 +177,10 @@ export class NoiseStorageService {
       ? source.perceivedEffects.map((effect) => this.normalizeEffect(effect))
       : [];
     const normalized: NoiseEvent = {
-      id: typeof source.id === 'string' && source.id ? source.id : `legacy-${index}-${crypto.randomUUID()}`,
+      id:
+        typeof source.id === 'string' && source.id
+          ? source.id
+          : `legacy-${index}-${crypto.randomUUID()}`,
       startedAt,
       endedAt: typeof source.endedAt === 'string' ? source.endedAt : undefined,
       duration: this.optionalNumber(source.duration),
@@ -183,7 +204,9 @@ export class NoiseStorageService {
       notes: typeof source.notes === 'string' ? source.notes : '',
       witnessesCount: this.optionalNumber(source.witnessesCount),
       status,
-      tags: Array.isArray(source.tags) ? source.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+      tags: Array.isArray(source.tags)
+        ? source.tags.filter((tag): tag is string => typeof tag === 'string')
+        : [],
       attachmentIds: Array.isArray(source.attachmentIds)
         ? source.attachmentIds.filter((id): id is string => typeof id === 'string')
         : [],
@@ -194,11 +217,7 @@ export class NoiseStorageService {
     return normalized;
   }
 
-  private normalizeChoice<T extends string>(
-    value: unknown,
-    choices: readonly T[],
-    fallback: T,
-  ): T {
+  private normalizeChoice<T extends string>(value: unknown, choices: readonly T[], fallback: T): T {
     return typeof value === 'string' && choices.includes(value as T) ? (value as T) : fallback;
   }
 
@@ -256,12 +275,17 @@ export class NoiseStorageService {
         event.perceivedIntensity < 1 ||
         event.perceivedIntensity > 5)
     ) {
-      throw new Error('L’intensità percepita deve essere non indicata oppure un numero intero da 1 a 5.');
+      throw new Error(
+        'L’intensità percepita deve essere non indicata oppure un numero intero da 1 a 5.',
+      );
     }
     if (!NOISE_EVENT_TYPES.includes(event.eventType)) {
       throw new Error('La tipologia dell’episodio non è valida.');
     }
-    if (!CONTINUITY_TYPES.includes(event.continuityType) || !EVENT_STATUSES.includes(event.status)) {
+    if (
+      !CONTINUITY_TYPES.includes(event.continuityType) ||
+      !EVENT_STATUSES.includes(event.status)
+    ) {
       throw new Error('Andamento o stato dell’episodio non valido.');
     }
     if (!/ipotesi/i.test(event.suspectedSource)) {

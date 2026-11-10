@@ -48,12 +48,10 @@ describe('NoiseStorageService', () => {
   afterEach(async () => {
     repositories.splice(0).forEach((repository) => repository.close());
     vaults.splice(0).forEach((vault) => vault.lock());
-    await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.deleteDatabase('noise-diary');
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-      request.onblocked = () => reject(new Error('IndexedDB deletion is blocked by another test connection.'));
-    });
+    await Promise.all([
+      deleteTestDatabase('noise-diary'),
+      deleteTestDatabase('noise-diary.profile-00000000-0000-4000-8000-000000000001'),
+    ]);
   });
 
   it('migrates user episodes to IndexedDB and removes previously seeded demo episodes', async () => {
@@ -102,9 +100,7 @@ describe('NoiseStorageService', () => {
       attachmentIds: [],
     };
 
-    await expect(storage.saveEvents([invalidEvent])).rejects.toThrow(
-      'un numero intero da 1 a 5',
-    );
+    await expect(storage.saveEvents([invalidEvent])).rejects.toThrow('un numero intero da 1 a 5');
   });
 
   it('accepts imported episodes with unreported intensity and rejects duplicate IDs', async () => {
@@ -162,6 +158,37 @@ describe('NoiseStorageService', () => {
 
     vaults[0].lock();
     await expect(storage.loadEvents()).rejects.toThrow('Sblocca il diario');
+  });
+
+  it('isolates encrypted events between local profiles in separate IndexedDB databases', async () => {
+    const profileId = 'profile-00000000-0000-4000-8000-000000000001';
+    const vault = new LocalVaultService();
+    vaults.push(vault);
+    await vault.create('first-profile-passphrase-2026');
+    const repository = new NoiseEventRepository(vault);
+    repositories.push(repository);
+    const storage = new NoiseStorageService(repository);
+    const firstEvent = eventForDeletion('shared-event-id');
+    firstEvent.description = 'first profile only';
+    await storage.saveEvents([firstEvent]);
+
+    vault.useProfile(profileId);
+    storage.useProfile(profileId);
+    await vault.create('second-profile-passphrase-2026');
+    expect(await storage.loadEvents()).toEqual([]);
+    const secondEvent = { ...firstEvent, description: 'second profile only' };
+    await storage.saveEvents([secondEvent]);
+    expect(await storage.loadEvents()).toEqual([secondEvent]);
+
+    vault.useProfile('legacy');
+    storage.useProfile('legacy');
+    await vault.unlock('first-profile-passphrase-2026');
+    expect(await storage.loadEvents()).toEqual([firstEvent]);
+
+    vault.useProfile(profileId);
+    storage.useProfile(profileId);
+    await vault.unlock('second-profile-passphrase-2026');
+    expect(await storage.loadEvents()).toEqual([secondEvent]);
   });
 
   it('atomically deletes an event and its associated encrypted audio records', async () => {
@@ -234,6 +261,15 @@ describe('NoiseStorageService', () => {
     expect(localStorage.getItem('noise-diary.events')).toBe('{invalid');
   });
 });
+
+function deleteTestDatabase(name: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(name);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => reject(new Error(`IndexedDB deletion is blocked for ${name}.`));
+  });
+}
 
 function eventForDeletion(id: string): NoiseEvent {
   return {
@@ -310,7 +346,10 @@ function readStoredClip(id: string): Promise<unknown> {
     openRequest.onerror = () => reject(openRequest.error);
     openRequest.onsuccess = () => {
       const database = openRequest.result;
-      const request = database.transaction('audio-clips', 'readonly').objectStore('audio-clips').get(id);
+      const request = database
+        .transaction('audio-clips', 'readonly')
+        .objectStore('audio-clips')
+        .get(id);
       request.onsuccess = () => {
         database.close();
         resolve(request.result);
@@ -329,7 +368,10 @@ function readStoredEvent(id: string): Promise<unknown> {
     openRequest.onerror = () => reject(openRequest.error);
     openRequest.onsuccess = () => {
       const database = openRequest.result;
-      const request = database.transaction('noise-events', 'readonly').objectStore('noise-events').get(id);
+      const request = database
+        .transaction('noise-events', 'readonly')
+        .objectStore('noise-events')
+        .get(id);
       request.onsuccess = () => {
         database.close();
         resolve(request.result);

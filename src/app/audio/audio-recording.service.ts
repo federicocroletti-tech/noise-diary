@@ -48,8 +48,15 @@ export class AudioRecordingService {
   private resultPromise?: Promise<AudioClip>;
   private resolveResult?: (clip: AudioClip) => void;
   private rejectResult?: (error: Error) => void;
+  private saveClip: (clip: AudioClip) => Promise<void>;
 
-  constructor(private readonly repository: AudioClipRepository) {}
+  constructor(private readonly repository: AudioClipRepository) {
+    this.saveClip = (clip) => this.repository.save(clip);
+  }
+
+  useSaveHandler(handler?: (clip: AudioClip) => Promise<void>): void {
+    this.saveClip = handler ?? ((clip) => this.repository.save(clip));
+  }
 
   get isRecording(): boolean {
     return this.recorder?.state === 'recording';
@@ -226,7 +233,7 @@ export class AudioRecordingService {
       },
     };
 
-    await this.repository.save(clip);
+    await this.saveClip(clip);
     this.chunks = [];
     this.recorder = undefined;
     this.resolveResult?.(clip);

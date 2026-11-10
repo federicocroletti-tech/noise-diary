@@ -1,0 +1,12 @@
+{
+  "name": "noise-diary-audio-function",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "aws4fetch": "^1.0.20",
+    "jose": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0"
+  }
+}

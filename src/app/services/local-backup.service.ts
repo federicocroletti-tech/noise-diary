@@ -28,6 +28,7 @@ export class LocalBackupService {
     events: NoiseEvent[],
     audioClips: AudioClip[],
     password: string,
+    source: 'local' | 'account' = 'local',
   ): Promise<string> {
     const eventIds = new Set<string>();
     for (const event of events) {
@@ -62,7 +63,9 @@ export class LocalBackupService {
       events,
       audioClips: encodedClips,
     };
-    return this.vault.encryptBackup(payload, password);
+    return source === 'account'
+      ? this.vault.encryptPortableBackup(payload, password)
+      : this.vault.encryptBackup(payload, password);
   }
 
   isEncryptedEnvelope(value: unknown): boolean {

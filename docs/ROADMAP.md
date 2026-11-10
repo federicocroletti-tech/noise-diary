@@ -1,5 +1,7 @@
 # Roadmap di audit e prodotto
 
+> Piano storico. La richiesta NOYSE del 2026-11-10 aggiorna il perimetro: inventario, gap, requisiti e backlog operativo sono in [NOYSE: analisi e piano di evoluzione](./NOYSE_EVOLUTION.md). Le fasi seguenti restano come contesto, non come stato aggiornato delle funzionalita'.
+
 La sequenza è proposta, non approvata. Nessuna feature oltre la Fase 0 è stata implementata in questo ciclo.
 
 ## 0. Audit e contenimento della privacy

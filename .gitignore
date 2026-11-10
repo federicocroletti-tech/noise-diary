@@ -7,7 +7,7 @@
 /bazel-out
 
 # Node
-/node_modules
+node_modules/
 npm-debug.log
 yarn-error.log
 
@@ -43,3 +43,11 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Local credentials and private diary backups
+.env
+.env.*
+!.env.example
+!.env.*.example
+/backup/
+*.ndbackup

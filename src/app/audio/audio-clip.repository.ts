@@ -1,16 +1,12 @@
 import { Injectable } from '@angular/core';
-import {
-  AudioClip,
-  AudioClipMetadata,
-  isAudioClipMetadata,
-} from './models/audio-clip.model';
+import { AudioClip, AudioClipMetadata, isAudioClipMetadata } from './models/audio-clip.model';
 import {
   EncryptedPayload,
   isArrayBuffer,
   LocalVaultService,
 } from '../services/local-vault.service';
+import { databaseNameForProfile, LEGACY_PROFILE_ID } from '../services/local-profile.service';
 
-const DATABASE_NAME = 'noise-diary';
 const DATABASE_VERSION = 2;
 const STORE_NAME = 'audio-clips';
 
@@ -49,8 +45,14 @@ export async function encryptAudioClip(
 export class AudioClipRepository {
   private databasePromise?: Promise<IDBDatabase>;
   private database?: IDBDatabase;
+  private profileId = LEGACY_PROFILE_ID;
 
   constructor(private readonly vault: LocalVaultService) {}
+
+  useProfile(profileId: string): void {
+    this.close();
+    this.profileId = profileId;
+  }
 
   async save(clip: AudioClip): Promise<void> {
     const database = await this.openDatabase();
@@ -110,7 +112,9 @@ export class AudioClipRepository {
           return this.decryptClip(record);
         }
         if (!this.isAudioClip(record)) {
-          throw new Error('Una registrazione salvata non è leggibile; i dati locali non sono stati modificati.');
+          throw new Error(
+            'Una registrazione salvata non è leggibile; i dati locali non sono stati modificati.',
+          );
         }
         legacyClips.push(record);
         return record;
@@ -131,7 +135,9 @@ export class AudioClipRepository {
         continue;
       }
       if (!this.isAudioClip(record)) {
-        throw new Error('Una registrazione salvata non è leggibile; i dati locali non sono stati modificati.');
+        throw new Error(
+          'Una registrazione salvata non è leggibile; i dati locali non sono stati modificati.',
+        );
       }
       legacyClips.push(record);
     }
@@ -177,10 +183,18 @@ export class AudioClipRepository {
     try {
       metadata = JSON.parse(new TextDecoder().decode(plaintext.subarray(4, audioStart)));
     } catch (error) {
-      throw new Error(`I metadati di una registrazione cifrata non sono leggibili: ${String(error)}`);
+      throw new Error(
+        `I metadati di una registrazione cifrata non sono leggibili: ${String(error)}`,
+      );
     }
-    if (!this.isAudioClipMetadata(metadata) || metadata.id !== record.id || metadata.eventId !== record.eventId) {
-      throw new Error('I metadati di una registrazione cifrata non rispettano il formato previsto.');
+    if (
+      !this.isAudioClipMetadata(metadata) ||
+      metadata.id !== record.id ||
+      metadata.eventId !== record.eventId
+    ) {
+      throw new Error(
+        'I metadati di una registrazione cifrata non rispettano il formato previsto.',
+      );
     }
 
     const audioBytes = plaintext.slice(audioStart);
@@ -232,7 +246,7 @@ export class AudioClipRepository {
     }
 
     this.databasePromise ??= new Promise((resolve, reject) => {
-      const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
+      const request = indexedDB.open(databaseNameForProfile(this.profileId), DATABASE_VERSION);
       request.onupgradeneeded = () => {
         const database = request.result;
         if (!database.objectStoreNames.contains(STORE_NAME)) {
@@ -248,8 +262,12 @@ export class AudioClipRepository {
         request.result.onversionchange = () => request.result.close();
         resolve(request.result);
       };
-      request.onerror = () => reject(request.error ?? new Error('Impossibile aprire IndexedDB.'));
-      request.onblocked = () => reject(new Error('Aggiornamento IndexedDB bloccato da un’altra scheda.'));
+      request.onerror = () => {
+        this.databasePromise = undefined;
+        reject(request.error ?? new Error('Impossibile aprire IndexedDB.'));
+      };
+      request.onblocked = () =>
+        reject(new Error('Aggiornamento IndexedDB bloccato da un’altra scheda.'));
     });
 
     return this.databasePromise;
@@ -267,9 +285,11 @@ export class AudioClipRepository {
       request.onsuccess = () => {
         result = request.result;
       };
-      request.onerror = () => reject(request.error ?? new Error('Operazione audio locale non riuscita.'));
+      request.onerror = () =>
+        reject(request.error ?? new Error('Operazione audio locale non riuscita.'));
       transaction.oncomplete = () => resolve(result);
-      transaction.onabort = () => reject(transaction.error ?? new Error('Transazione audio locale annullata.'));
+      transaction.onabort = () =>
+        reject(transaction.error ?? new Error('Transazione audio locale annullata.'));
     });
   }
 }
