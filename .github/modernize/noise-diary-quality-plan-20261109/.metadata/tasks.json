@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Tasks for behavior-preserving quality improvements to Diario Rumore.",
+  "tasks": [
+    {
+      "type": "setupBaseline",
+      "id": "001-setup-baseline-user-flows",
+      "description": "Map existing user journeys and capture the pre-change behavior, unit, build, and runtime baseline.",
+      "reason": "A frozen characterization baseline is needed before restructuring the broad root component or changing user interactions.",
+      "requirements": "Walk through and document setup, unlock, recovery, lock, event create/edit/correct/search/sort/select/delete, recording permission/start/stop, legacy JSON import and export, encrypted backup export/import, append/replace and conflict resolution, reload persistence, and deletion. Describe the component/service boundaries and the data-format and local-only invariants from the existing implementation. Record the current npm test/build results and a local runtime smoke check using synthetic data and isolated browser storage. Capture a frozen E2E behavior specification and identify an existing approved browser runner if available. The project currently declares no E2E runner or E2E script: do not install packages or download browsers without explicit approval; record the E2E automation portion as blocked pending an approved existing runner or that approval. Never inspect or use sensitive user-local data; do not include it in scans, snapshots, fixtures, or tests.",
+      "snapshotFolder": "src",
+      "dependencies": [],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "002-transform-incremental-refactor",
+      "description": "Refactor the root component incrementally while preserving the existing user-visible behavior and local data formats.",
+      "reason": "The assessment identifies a large root component coordinating unrelated journeys, increasing change risk and limiting testability.",
+      "requirements": "Use the flow map and baseline to extract or isolate one existing responsibility at a time (for example vault/recovery, event editing/listing, import/export, or audio). Keep existing storage, encryption, vault configuration, IndexedDB schema, migration behavior, JSON import/export, and encrypted backup formats compatible. Add focused characterization/unit tests before or with each extraction, validate synthetic import/restore/deletion scenarios, and avoid a wholesale rewrite, new backend, routing, unrelated behavior changes, or new dependencies. Preserve unrelated worktree changes and do not inspect, copy, hash, move, edit, stage, or delete sensitive user-local data.",
+      "dependencies": [
+        "001-setup-baseline-user-flows"
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "true",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "003-transform-ui-accessibility",
+      "description": "Improve applicable UI/UX and accessibility issues without changing the diary’s core workflows.",
+      "reason": "The assessment found keyboard, focus, dialog, contrast, reflow, and reduced-motion behavior that needs verification and targeted improvement.",
+      "requirements": "Review and address applicable usability and accessibility findings with WCAG 2.2 AA as the target: semantic controls and accessible names, keyboard and screen-reader behavior for event selection, visible focus, dialog initial/contained/restored focus and background interaction, errors/status announcements, contrast, zoom/reflow, target size, and reduced motion. Verify recording-permission and interaction feedback. Use existing tooling where possible; do not add dependencies without explicit approval. Record automated and manual evidence and remaining limitations; do not claim conformance without sufficient verification.",
+      "dependencies": [
+        "002-transform-incremental-refactor"
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "true",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "004-transform-app-shell-seo",
+      "description": "Review and improve only the public app-shell SEO metadata and indexing policy.",
+      "reason": "The assessment found basic Italian metadata but no canonical/social metadata or explicit indexing policy; diary contents must remain private.",
+      "requirements": "Review title, description, language, canonical/social preview metadata, and public app-shell indexing policy in the context of static hosting. Make only applicable, reversible app-shell changes after documenting the discoverability decision. Ensure diary records and private content are never exposed or indexed. Do not add server-side rendering, routes, backend services, or dependencies; do not treat robots directives as a confidentiality control.",
+      "dependencies": [
+        "003-transform-ui-accessibility"
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "005-transform-privacy-controls",
+      "description": "Review and strengthen applicable technical privacy controls while retaining the local-first design.",
+      "reason": "Local storage, audio, exports, backups, deletion limits, and privacy claims are central to this application’s behavior.",
+      "requirements": "Verify that diary data remains local and that no backend, account, synchronization, telemetry, analytics, or automatic network transmission is introduced. Review relevant data flows, recording consent/permission, privacy-safe errors and logging, export/import warnings, deletion limitations, and service-worker scope. Preserve existing storage and backup formats and use only synthetic test data. State the limitations of browser/profile copies and unlocked-client exposure accurately. Do not make legal, GDPR-compliance, or cryptographic-adequacy claims; do not add dependencies or services.",
+      "dependencies": [
+        "004-transform-app-shell-seo"
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "true",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "006-security-dependency-review",
+      "description": "Review known dependency security advisories and verify the requested privacy-related technical boundaries.",
+      "reason": "A bounded security check helps ensure the final application remains safe without broad dependency churn or new runtime services.",
+      "requirements": "Use available existing tooling and the lockfile to check for confirmed known dependency vulnerabilities, and verify that the application introduces no backend, telemetry, or unintended data egress. Remediate only confirmed relevant vulnerabilities with the smallest compatible change, then rebuild and retest. Do not perform broad dependency upgrades, add dependencies, alter data formats, make legal/compliance claims, or touch sensitive user-local data. If a safe fix requires a major upgrade or a new tool, record the finding and obtain approval before proceeding.",
+      "dependencies": [
+        "005-transform-privacy-controls"
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "integrationTest",
+      "id": "007-integrationTest-e2e-regression",
+      "description": "Run synthetic browser E2E journeys and post-change runtime verification against the frozen baseline.",
+      "reason": "The refactor and interaction changes require browser-level regression evidence beyond the existing unit suite.",
+      "requirements": "Use the frozen baseline and synthetic fixtures in a fresh isolated browser profile to verify setup/unlock/recovery/lock; event create/edit/correct/search/sort/select/delete; recording permission and lifecycle; JSON import/export; encrypted backup export, append/replace, conflict handling and restore; and persistence after reload. Compare outcomes with the baseline and run the relevant unit suite, production build, and local runtime smoke checks. Do not install dependencies or download browsers without explicit approval; if no approved existing E2E runner is available, mark browser automation blocked and report the evidence that could be collected without it. Never use real diary data or sensitive user-local files.",
+      "dependencies": [
+        "001-setup-baseline-user-flows",
+        "002-transform-incremental-refactor",
+        "003-transform-ui-accessibility",
+        "004-transform-app-shell-seo",
+        "005-transform-privacy-controls",
+        "006-security-dependency-review"
+      ]
+    }
+  ],
+  "metadata": {
+    "planName": "noise-diary-quality-plan-20261109",
+    "projectName": "Diario Rumore",
+    "language": "typescript",
+    "createdAt": "2026-11-09T23:27:24+01:00",
+    "version": "1.0"
+  }
+}
