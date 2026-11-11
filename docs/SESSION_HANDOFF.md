@@ -41,3 +41,22 @@
 5. Solo dopo l’approvazione dell’audit, pianificare `feat/noise-event-domain` con timezone, distinzione tra osservazioni/ipotesi, schema versionato e history delle correzioni.
 
 Nessuna nuova feature è stata implementata in questa sessione. Nessun dato del diario o registrazione è stato creato o modificato.
+
+## Aggiornamento 2026-11-11: repo satellite
+
+Sono stati creati 6 repository privati su `federicocroletti-tech`, ciascuno con README, LICENSE (tutti i diritti riservati), DATA_SOURCES.md e DESIGN.md (solo progettazione, nessun codice):
+
+- `noise-notice-recipients-ipa`: destinatari ufficiali da IPA (CC BY 4.0, API CKAN). Priorità 1.
+- `noise-competent-authority-index`: indice delle competenze per giurisdizione.
+- `noise-acoustic-zone-checker`: classe acustica per punto. Spike obbligatorio sui dati.
+- `noise-diary-legal-context`: contesto normativo indicativo sugli eventi. Dipende dal precedente.
+- `noise-anonymous-area-map`: mappa aggregata anonima. Bloccata da valutazione GDPR/DPIA.
+- `noise-territory-dashboard`: livelli territoriali sugli eventi. Dopo i precedenti.
+
+Esiti della verifica dati:
+
+- Zonizzazione acustica del Comune di Milano non individuata come open data su `dati.comune.milano.it` né su `dati.gov.it`. Esiste il dataset regionale `dh6e-qy9d` (dati.lombardia.it, CC0): da verificare se contiene Milano.
+- Nessun dataset "cantieri" su `dati.comune.milano.it`.
+- Il solo dataset acustico di Milano trovato è DS1678 (controlli rumore aggregati 2012-2022, non aggiornato).
+
+Prossimi passi: spike IPA (campi e volumi), spike sul dataset regionale per Milano, decisione sullo stack condiviso (libreria TypeScript riusabile). Le identità dei commit dei repo satellite usano l'email noreply personale, non quella aziendale.
