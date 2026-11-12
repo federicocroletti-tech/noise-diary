@@ -20,6 +20,8 @@ test.describe('Diario locale', () => {
 
     const item = page.locator('.event-list li').filter({ hasText: 'Cucina' });
     await expect(item).toBeVisible();
+    await expect(item).toContainText('Ronzio');
+    await expect(item).not.toContainText('HUM');
     await item.click();
     await expect(page.getByRole('heading', { name: 'Dettaglio' })).toBeVisible();
     await expect(page.locator('.detail-panel')).toContainText('Ronzio sintetico per il test.');
