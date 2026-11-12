@@ -940,6 +940,49 @@ describe('App', () => {
     expect(compiled.textContent).toContain('Originale.');
   });
 
+  it('distinguishes an empty search result from an empty diary and clears the search', async () => {
+    storage.loadEvents.mockResolvedValue([
+      {
+        id: 'event-search',
+        startedAt: '2026-10-22T22:04:00.000Z',
+        createdAt: '2026-10-22T22:05:00.000Z',
+        updatedAt: '2026-10-22T22:05:00.000Z',
+        locationLabel: 'Cucina',
+        room: '',
+        eventType: 'HUM',
+        continuityType: 'unknown',
+        perceivedIntensity: 2,
+        perceivedEffects: ['simple-observation'],
+        suspectedSource: 'Non identificata (ipotesi)',
+        description: 'Sintetico.',
+        notes: '',
+        status: 'draft',
+        tags: [],
+        attachmentIds: [],
+      },
+    ]);
+    const fixture = await createLocalFixture();
+    await createVault(fixture);
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    expect(compiled.querySelector('.event-list small')?.textContent?.trim()).not.toMatch(/^·/);
+
+    const search = compiled.querySelector<HTMLInputElement>('input[type="search"]')!;
+    search.value = 'garage';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+
+    expect(compiled.textContent).toContain('Nessun episodio corrisponde a “garage”');
+    expect(compiled.textContent).not.toContain('Nessun episodio nel diario');
+
+    [...compiled.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.includes('Cancella ricerca'))
+      ?.click();
+    fixture.detectChanges();
+
+    expect(compiled.querySelectorAll('.event-list li')).toHaveLength(1);
+  });
+
   it('preserves unreported intensity and effects when correcting another field', async () => {
     const existingEvent = {
       id: 'event-with-unreported-values',

@@ -1,5 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, OnDestroy, signal } from '@angular/core';
+import {
+  afterNextRender,
+  Component,
+  computed,
+  inject,
+  Injector,
+  OnDestroy,
+  signal,
+} from '@angular/core';
 import { AudioClip, AudioClipKind } from './audio/models/audio-clip.model';
 import { AudioClipRepository } from './audio/audio-clip.repository';
 import {
@@ -113,6 +121,7 @@ const EMPTY_DRAFT: NoiseEventDraft = {
   styleUrl: './app.scss',
 })
 export class App implements OnDestroy {
+  private readonly injector = inject(Injector);
   private diaryRevision = 0;
   private audioRequestId = 0;
 
@@ -1018,6 +1027,16 @@ export class App implements OnDestroy {
       return;
     }
     this.showForm.update((value) => !value);
+  }
+
+  protected openNewEpisode(): void {
+    if (this.editingEventId()) {
+      return;
+    }
+    this.showForm.set(true);
+    afterNextRender(() => document.getElementById('episode-location')?.focus(), {
+      injector: this.injector,
+    });
   }
 
   protected beginEdit(event: NoiseEvent): void {

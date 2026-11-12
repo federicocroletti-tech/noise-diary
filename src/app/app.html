@@ -586,6 +586,7 @@
           <label>
             <span>Luogo</span>
             <input
+              id="episode-location"
               type="text"
               [value]="draft().locationLabel"
               (input)="onFieldChange('locationLabel', $any($event.target).value)"
@@ -822,22 +823,29 @@
       </section>
 
       <section class="panel list-panel">
-        <div class="section-heading compact">
+        <div class="section-heading">
           <h2>Diario</h2>
-          <div class="filters">
-            <input
-              type="search"
-              [value]="search()"
-              (input)="search.set($any($event.target).value)"
-              placeholder="Cerca evento"
-              aria-label="Cerca evento"
-            />
-            <select [value]="sortMode()" (change)="sortMode.set($any($event.target).value)">
-              <option value="recent">Più recenti</option>
-              <option value="intensity">Intensità</option>
-              <option value="room">Stanza</option>
-            </select>
-          </div>
+          <span *ngIf="events().length">
+            {{ filteredEvents().length }} di {{ events().length }} episodi
+          </span>
+        </div>
+        <div class="filters" *ngIf="events().length">
+          <input
+            type="search"
+            [value]="search()"
+            (input)="search.set($any($event.target).value)"
+            placeholder="Cerca per luogo, stanza, note…"
+            aria-label="Cerca evento"
+          />
+          <select
+            [value]="sortMode()"
+            (change)="sortMode.set($any($event.target).value)"
+            aria-label="Ordina episodi"
+          >
+            <option value="recent">Più recenti</option>
+            <option value="intensity">Intensità</option>
+            <option value="room">Stanza</option>
+          </select>
         </div>
 
         <ul class="event-list" *ngIf="filteredEvents().length; else emptyState">
@@ -855,19 +863,41 @@
               <strong>{{ event.locationLabel }}</strong>
               <span>{{ labelFor(event.eventType) }}</span>
             </div>
-            <small>{{ event.room }} · {{ event.startedAt | date: 'dd MMM yyyy, HH:mm' }}</small>
+            <small
+              >{{ event.room ? event.room + ' · ' : ''
+              }}{{ event.startedAt | date: 'dd MMM yyyy, HH:mm' }}</small
+            >
             <p>{{ event.description || 'Nessuna descrizione inserita.' }}</p>
           </li>
         </ul>
 
         <ng-template #emptyState>
-          <p class="empty-state">
-            {{
-              accountMode() === 'signed-in'
-                ? 'Nessun episodio nel diario. I nuovi episodi saranno salvati nel tuo account cloud.'
-                : 'Nessun episodio nel diario. Crea un episodio o importa un backup cifrato; i dati restano cifrati su questo dispositivo.'
-            }}
-          </p>
+          <div class="empty-state" *ngIf="events().length; else emptyDiary">
+            <p>Nessun episodio corrisponde a “{{ search() }}”.</p>
+            <button type="button" class="secondary" (click)="search.set('')">
+              Cancella ricerca
+            </button>
+          </div>
+        </ng-template>
+        <ng-template #emptyDiary>
+          <div class="empty-state">
+            <p>
+              {{
+                accountMode() === 'signed-in'
+                  ? 'Nessun episodio nel diario. I nuovi episodi saranno salvati nel tuo account cloud.'
+                  : 'Nessun episodio nel diario. Crea un episodio o importa un backup cifrato; i dati restano cifrati su questo dispositivo.'
+              }}
+            </p>
+            <button
+              *ngIf="!showForm()"
+              type="button"
+              class="primary"
+              [disabled]="editingEventId() !== null || authBusy()"
+              (click)="openNewEpisode()"
+            >
+              Crea il primo episodio
+            </button>
+          </div>
         </ng-template>
       </section>
 

@@ -217,8 +217,24 @@ small {
 
 .filters {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
+  margin-bottom: 16px;
+}
+
+.filters input {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.filters select {
+  flex: 0 1 170px;
+  min-width: 140px;
+}
+
+.empty-state p {
+  margin: 0 0 14px;
+  line-height: 1.6;
 }
 
 .event-list {
@@ -525,13 +541,7 @@ small {
     align-items: flex-start;
   }
 
-  .header-actions,
-  .filters {
-    width: 100%;
-  }
-
-  .filters input,
-  .filters select {
+  .header-actions {
     width: 100%;
   }
 }
