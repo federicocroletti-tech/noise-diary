@@ -573,506 +573,508 @@
       {{ accountMode() === 'signed-in' ? 'Caricamento del diario account…' : 'Caricamento del diario locale…' }}
     </section>
 
-    <section class="panel form-panel" *ngIf="showForm() && !loadingEvents()">
-      <div class="section-heading">
-        <h2>{{ editingEventId() ? 'Modifica episodio' : 'Nuovo episodio' }}</h2>
-        <span>
-          {{ accountMode() === 'signed-in' ? 'Dati associati al tuo account' : 'Dati locali di questo dispositivo' }}
-        </span>
-      </div>
-
-      <form class="event-form" (submit)="$event.preventDefault(); submitDraft()">
-        <label>
-          <span>Luogo</span>
-          <input
-            type="text"
-            [value]="draft().locationLabel"
-            (input)="onFieldChange('locationLabel', $any($event.target).value)"
-            placeholder="Es. Cucina, stanza notte"
-          />
-        </label>
-
-        <div class="two-columns">
-          <label>
-            <span>Data e ora di inizio</span>
-            <input
-              type="datetime-local"
-              required
-              [value]="draft().startedAt"
-              (input)="onFieldChange('startedAt', $any($event.target).value)"
-            />
-          </label>
-          <label>
-            <span>Durata (minuti, facoltativa)</span>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              [value]="draft().durationMinutes ?? ''"
-              (input)="
-                onFieldChange(
-                  'durationMinutes',
-                  $any($event.target).value ? +$any($event.target).value : null
-                )
-              "
-            />
-          </label>
+    <div class="workspace">
+      <section class="panel form-panel" *ngIf="showForm() && !loadingEvents()">
+        <div class="section-heading">
+          <h2>{{ editingEventId() ? 'Modifica episodio' : 'Nuovo episodio' }}</h2>
+          <span>
+            {{ accountMode() === 'signed-in' ? 'Dati associati al tuo account' : 'Dati locali di questo dispositivo' }}
+          </span>
         </div>
 
-        <div class="two-columns">
+        <form class="event-form" (submit)="$event.preventDefault(); submitDraft()">
           <label>
-            <span>Stanza</span>
+            <span>Luogo</span>
             <input
               type="text"
-              [value]="draft().room"
-              (input)="onFieldChange('room', $any($event.target).value)"
+              [value]="draft().locationLabel"
+              (input)="onFieldChange('locationLabel', $any($event.target).value)"
+              placeholder="Es. Cucina, stanza notte"
             />
           </label>
 
-          <label>
-            <span>Tipo evento</span>
-            <select
-              [value]="draft().eventType"
-              (change)="onFieldChange('eventType', $any($event.target).value)"
-            >
-              <option
-                *ngFor="let option of eventTypeOptions"
-                [value]="option"
-                [selected]="option === draft().eventType"
-              >
-                {{ labelFor(option) }}
-              </option>
-            </select>
-          </label>
-        </div>
-
-        <div class="two-columns">
-          <div>
+          <div class="two-columns">
             <label>
-              <span>Intensità percepita (1–5, soggettiva)</span>
+              <span>Data e ora di inizio</span>
               <input
-                type="range"
+                type="datetime-local"
+                required
+                [value]="draft().startedAt"
+                (input)="onFieldChange('startedAt', $any($event.target).value)"
+              />
+            </label>
+            <label>
+              <span>Durata (minuti, facoltativa)</span>
+              <input
+                type="number"
                 min="1"
-                max="5"
                 step="1"
-                [value]="draft().perceivedIntensity"
+                [value]="draft().durationMinutes ?? ''"
                 (input)="
-                  intensityUnreported.set(false);
-                  onFieldChange('perceivedIntensity', +$any($event.target).value)
+                  onFieldChange(
+                    'durationMinutes',
+                    $any($event.target).value ? +$any($event.target).value : null
+                  )
                 "
               />
-              <small *ngIf="intensityUnreported()"
-                >Non indicata; aggiungi una valutazione solo se vuoi.</small
-              >
-              <small *ngIf="!intensityUnreported()"
-                >{{ draft().perceivedIntensity }}/5 · valutazione personale</small
-              >
             </label>
-            <button
-              *ngIf="intensityUnreported()"
-              type="button"
-              class="secondary"
-              (click)="intensityUnreported.set(false)"
-            >
-              Indica un'intensità
-            </button>
           </div>
 
-          <label>
-            <span>Andamento</span>
-            <select
-              [value]="draft().continuityType"
-              (change)="onFieldChange('continuityType', $any($event.target).value)"
-            >
-              <option
-                *ngFor="let option of continuityOptions"
-                [value]="option"
-                [selected]="option === draft().continuityType"
-              >
-                {{ labelFor(option) }}
-              </option>
-            </select>
-          </label>
-        </div>
-
-        <div class="two-columns">
-          <div *ngIf="effectsUnreported(); else effectsControl">
-            <span>Effetto percepito</span>
-            <p>Non indicato</p>
-            <button type="button" class="secondary" (click)="effectsUnreported.set(false)">
-              Seleziona un effetto
-            </button>
-          </div>
-          <ng-template #effectsControl>
+          <div class="two-columns">
             <label>
-              <span>Effetto percepito</span>
+              <span>Stanza</span>
+              <input
+                type="text"
+                [value]="draft().room"
+                (input)="onFieldChange('room', $any($event.target).value)"
+              />
+            </label>
+
+            <label>
+              <span>Tipo evento</span>
               <select
-                [value]="draft().perceivedEffects"
-                (change)="onFieldChange('perceivedEffects', $any($event.target).value)"
+                [value]="draft().eventType"
+                (change)="onFieldChange('eventType', $any($event.target).value)"
               >
                 <option
-                  *ngFor="let option of perceivedEffectOptions"
+                  *ngFor="let option of eventTypeOptions"
                   [value]="option"
-                  [selected]="option === draft().perceivedEffects"
+                  [selected]="option === draft().eventType"
                 >
                   {{ labelFor(option) }}
                 </option>
               </select>
             </label>
-          </ng-template>
-          <label>
-            <span>Stato</span>
-            <select
-              [value]="draft().status"
-              (change)="onFieldChange('status', $any($event.target).value)"
-            >
-              <option
-                *ngFor="let option of statusOptions"
-                [value]="option"
-                [selected]="option === draft().status"
+          </div>
+
+          <div class="two-columns">
+            <div>
+              <label>
+                <span>Intensità percepita (1–5, soggettiva)</span>
+                <input
+                  type="range"
+                  min="1"
+                  max="5"
+                  step="1"
+                  [value]="draft().perceivedIntensity"
+                  (input)="
+                    intensityUnreported.set(false);
+                    onFieldChange('perceivedIntensity', +$any($event.target).value)
+                  "
+                />
+                <small *ngIf="intensityUnreported()"
+                  >Non indicata; aggiungi una valutazione solo se vuoi.</small
+                >
+                <small *ngIf="!intensityUnreported()"
+                  >{{ draft().perceivedIntensity }}/5 · valutazione personale</small
+                >
+              </label>
+              <button
+                *ngIf="intensityUnreported()"
+                type="button"
+                class="secondary"
+                (click)="intensityUnreported.set(false)"
               >
-                {{ labelFor(option) }}
-              </option>
-            </select>
-          </label>
-        </div>
-
-        <label>
-          <span>Sorgente sospetta</span>
-          <input
-            type="text"
-            [value]="draft().suspectedSource"
-            (input)="onFieldChange('suspectedSource', $any($event.target).value)"
-          />
-        </label>
-
-        <label>
-          <span>Descrizione</span>
-          <textarea
-            rows="3"
-            [value]="draft().description"
-            (input)="onFieldChange('description', $any($event.target).value)"
-            placeholder="Descrivi la percezione soggettiva e il contesto."
-          ></textarea>
-        </label>
-
-        <label>
-          <span>Note</span>
-          <textarea
-            rows="2"
-            [value]="draft().notes"
-            (input)="onFieldChange('notes', $any($event.target).value)"
-            placeholder="Eventi e osservazioni rilevanti."
-          ></textarea>
-        </label>
-
-        <label>
-          <span>Tag (separati da virgola)</span>
-          <input
-            type="text"
-            [value]="draft().tags"
-            (input)="onFieldChange('tags', $any($event.target).value)"
-          />
-        </label>
-
-        <div class="two-columns">
-          <label>
-            <span>Finestre</span>
-            <input
-              type="text"
-              [value]="draft().windowsState"
-              (input)="onFieldChange('windowsState', $any($event.target).value)"
-            />
-          </label>
-
-          <label>
-            <span>Porta</span>
-            <input
-              type="text"
-              [value]="draft().doorsState"
-              (input)="onFieldChange('doorsState', $any($event.target).value)"
-            />
-          </label>
-        </div>
-
-        <label *ngIf="editingEventId()">
-          <span>Motivo della modifica (obbligatorio)</span>
-          <textarea
-            rows="2"
-            required
-            [value]="correctionReason()"
-            (input)="correctionReason.set($any($event.target).value)"
-            aria-describedby="correction-reason-help"
-          ></textarea>
-          <small id="correction-reason-help">
-            Il motivo e la versione precedente vengono conservati nella cronologia locale.
-          </small>
-        </label>
-
-        <div class="audio-file-actions">
-          <button type="submit" class="primary submit">
-            {{ editingEventId() ? 'Salva correzione' : 'Salva evento' }}
-          </button>
-          <button *ngIf="editingEventId()" type="button" class="secondary" (click)="cancelEdit()">
-            Annulla modifica
-          </button>
-        </div>
-      </form>
-    </section>
-
-    <section class="panel list-panel">
-      <div class="section-heading compact">
-        <h2>Diario</h2>
-        <div class="filters">
-          <input
-            type="search"
-            [value]="search()"
-            (input)="search.set($any($event.target).value)"
-            placeholder="Cerca evento"
-            aria-label="Cerca evento"
-          />
-          <select [value]="sortMode()" (change)="sortMode.set($any($event.target).value)">
-            <option value="recent">Più recenti</option>
-            <option value="intensity">Intensità</option>
-            <option value="room">Stanza</option>
-          </select>
-        </div>
-      </div>
-
-      <ul class="event-list" *ngIf="filteredEvents().length; else emptyState">
-        <li
-          *ngFor="let event of filteredEvents()"
-          [class.active]="event.id === selectedEvent()?.id"
-          role="button"
-          tabindex="0"
-          [attr.aria-pressed]="event.id === selectedEvent()?.id"
-          [attr.aria-label]="'Seleziona episodio: ' + event.locationLabel"
-          (click)="selectEvent(event.id)"
-          (keydown)="onEventItemKeydown($event, event.id)"
-        >
-          <div class="event-header">
-            <strong>{{ event.locationLabel }}</strong>
-            <span>{{ labelFor(event.eventType) }}</span>
-          </div>
-          <small>{{ event.room }} · {{ event.startedAt | date: 'dd MMM yyyy, HH:mm' }}</small>
-          <p>{{ event.description || 'Nessuna descrizione inserita.' }}</p>
-        </li>
-      </ul>
-
-      <ng-template #emptyState>
-        <p class="empty-state">
-          {{
-            accountMode() === 'signed-in'
-              ? 'Nessun episodio nel diario. I nuovi episodi saranno salvati nel tuo account cloud.'
-              : 'Nessun episodio nel diario. Crea un episodio o importa un backup cifrato; i dati restano cifrati su questo dispositivo.'
-          }}
-        </p>
-      </ng-template>
-    </section>
-
-    <aside class="panel detail-panel" *ngIf="selectedEvent() as event">
-      <div class="section-heading compact">
-        <h2>Dettaglio</h2>
-        <span class="status-badge">{{ labelFor(event.status) }}</span>
-      </div>
-
-      <div class="detail-summary">
-        <div class="tag-row">
-          <span class="tag">{{ labelFor(event.eventType) }}</span>
-          <span class="tag secondary">{{ labelFor(event.continuityType) }}</span>
-        </div>
-        <h3>{{ event.locationLabel }}</h3>
-        <p>{{ event.description }}</p>
-      </div>
-
-      <div class="audio-file-actions">
-        <button
-          type="button"
-          class="secondary"
-          (click)="beginEdit(event)"
-          aria-label="Modifica episodio"
-        >
-          Modifica episodio
-        </button>
-        <button
-          type="button"
-          class="danger"
-          (click)="deleteEvent(event)"
-          aria-label="Elimina episodio"
-        >
-          Elimina episodio
-        </button>
-      </div>
-
-      <section class="audio-section" aria-labelledby="audio-heading">
-        <div class="audio-heading">
-          <div>
-            <h4 id="audio-heading">Registrazioni audio</h4>
-            <p>
-              {{
-                accountMode() === 'signed-in'
-                  ? 'Acquisite dal microfono e caricate nello storage privato del tuo account. Non sono cifrate end-to-end.'
-                  : 'Acquisite dal microfono e conservate solo in questo browser.'
-              }}
-            </p>
-          </div>
-          <span *ngIf="recordingActive()" class="recording-indicator" role="status">
-            <span class="recording-dot"></span>
-            {{ recordingPaused() ? 'In pausa' : 'Registrazione attiva' }}
-            · {{ formatDuration(recordingDurationMs()) }}
-          </span>
-        </div>
-
-        <label class="audio-kind">
-          <span>Tipo di registrazione</span>
-          <select
-            [value]="recordingKind()"
-            [disabled]="recordingActive()"
-            (change)="setRecordingKind($any($event.target).value)"
-          >
-            <option value="event">Evento</option>
-            <option value="background">Rumore di fondo</option>
-          </select>
-        </label>
-
-        <p class="audio-consent">
-          La registrazione inizia solo dopo aver premuto il pulsante. Evita di acquisire
-          conversazioni o persone non necessarie. Limite massimo:
-          {{ maxRecordingSeconds / 60 }} minuti o 50 MB.
-          {{
-            accountMode() === 'signed-in'
-              ? 'Al salvataggio, l’audio viene caricato nel tuo account cloud.'
-              : 'Nessun audio viene caricato online.'
-          }}
-        </p>
-
-        <div class="audio-controls">
-          <button
-            *ngIf="!recordingActive()"
-            type="button"
-            class="primary"
-            (click)="startAudioRecording()"
-            [attr.aria-label]="'Avvia registrazione per ' + event.locationLabel"
-          >
-            Avvia registrazione
-          </button>
-          <ng-container *ngIf="recordingActive()">
-            <button
-              *ngIf="!recordingPaused() && recordingPauseSupported()"
-              type="button"
-              class="secondary"
-              (click)="pauseAudioRecording()"
-              aria-label="Metti in pausa la registrazione"
-            >
-              Pausa
-            </button>
-            <button
-              *ngIf="recordingPaused()"
-              type="button"
-              class="secondary"
-              (click)="resumeAudioRecording()"
-              aria-label="Riprendi la registrazione"
-            >
-              Riprendi
-            </button>
-            <button
-              type="button"
-              class="danger"
-              (click)="stopAudioRecording()"
-              aria-label="Ferma e salva la registrazione"
-            >
-              Ferma e salva
-            </button>
-          </ng-container>
-        </div>
-
-        <p *ngIf="audioStatus()" class="audio-status" role="status" aria-live="polite">
-          {{ audioStatus() }}
-        </p>
-        <p *ngIf="audioError()" class="audio-error" role="alert">{{ audioError() }}</p>
-
-        <ul class="audio-list" *ngIf="audioClips().length; else noAudio">
-          <li *ngFor="let clip of audioClips()">
-            <div class="audio-file-heading">
-              <strong>{{ clip.kind === 'background' ? 'Rumore di fondo' : 'Evento' }}</strong>
-              <span>{{ clip.createdAt | date: 'dd MMM yyyy, HH:mm' }}</span>
-            </div>
-            <audio controls preload="none" [src]="getAudioUrl(clip.id)">
-              Il browser non supporta la riproduzione audio.
-            </audio>
-            <div class="audio-meta">
-              <span>{{ formatDuration(clip.durationMs) }}</span>
-              <span>{{ (clip.sizeBytes / 1024 / 1024).toFixed(2) }} MB</span>
-              <span>{{ clip.mimeType }}</span>
-            </div>
-            <details>
-              <summary>Integrità e provenienza</summary>
-              <p>
-                SHA-256: <code>{{ clip.sha256 }}</code>
-              </p>
-              <p>
-                Origine: microfono · piattaforma: {{ clip.device.platform || 'non disponibile' }}
-              </p>
-            </details>
-            <div class="audio-file-actions">
-              <button type="button" class="secondary" (click)="downloadAudioClip(clip)">
-                Scarica copia
+                Indica un'intensità
               </button>
-              <button type="button" class="danger" (click)="deleteAudioClip(clip)">Elimina</button>
             </div>
+
+            <label>
+              <span>Andamento</span>
+              <select
+                [value]="draft().continuityType"
+                (change)="onFieldChange('continuityType', $any($event.target).value)"
+              >
+                <option
+                  *ngFor="let option of continuityOptions"
+                  [value]="option"
+                  [selected]="option === draft().continuityType"
+                >
+                  {{ labelFor(option) }}
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <div class="two-columns">
+            <div *ngIf="effectsUnreported(); else effectsControl">
+              <span>Effetto percepito</span>
+              <p>Non indicato</p>
+              <button type="button" class="secondary" (click)="effectsUnreported.set(false)">
+                Seleziona un effetto
+              </button>
+            </div>
+            <ng-template #effectsControl>
+              <label>
+                <span>Effetto percepito</span>
+                <select
+                  [value]="draft().perceivedEffects"
+                  (change)="onFieldChange('perceivedEffects', $any($event.target).value)"
+                >
+                  <option
+                    *ngFor="let option of perceivedEffectOptions"
+                    [value]="option"
+                    [selected]="option === draft().perceivedEffects"
+                  >
+                    {{ labelFor(option) }}
+                  </option>
+                </select>
+              </label>
+            </ng-template>
+            <label>
+              <span>Stato</span>
+              <select
+                [value]="draft().status"
+                (change)="onFieldChange('status', $any($event.target).value)"
+              >
+                <option
+                  *ngFor="let option of statusOptions"
+                  [value]="option"
+                  [selected]="option === draft().status"
+                >
+                  {{ labelFor(option) }}
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            <span>Sorgente sospetta</span>
+            <input
+              type="text"
+              [value]="draft().suspectedSource"
+              (input)="onFieldChange('suspectedSource', $any($event.target).value)"
+            />
+          </label>
+
+          <label>
+            <span>Descrizione</span>
+            <textarea
+              rows="3"
+              [value]="draft().description"
+              (input)="onFieldChange('description', $any($event.target).value)"
+              placeholder="Descrivi la percezione soggettiva e il contesto."
+            ></textarea>
+          </label>
+
+          <label>
+            <span>Note</span>
+            <textarea
+              rows="2"
+              [value]="draft().notes"
+              (input)="onFieldChange('notes', $any($event.target).value)"
+              placeholder="Eventi e osservazioni rilevanti."
+            ></textarea>
+          </label>
+
+          <label>
+            <span>Tag (separati da virgola)</span>
+            <input
+              type="text"
+              [value]="draft().tags"
+              (input)="onFieldChange('tags', $any($event.target).value)"
+            />
+          </label>
+
+          <div class="two-columns">
+            <label>
+              <span>Finestre</span>
+              <input
+                type="text"
+                [value]="draft().windowsState"
+                (input)="onFieldChange('windowsState', $any($event.target).value)"
+              />
+            </label>
+
+            <label>
+              <span>Porta</span>
+              <input
+                type="text"
+                [value]="draft().doorsState"
+                (input)="onFieldChange('doorsState', $any($event.target).value)"
+              />
+            </label>
+          </div>
+
+          <label *ngIf="editingEventId()">
+            <span>Motivo della modifica (obbligatorio)</span>
+            <textarea
+              rows="2"
+              required
+              [value]="correctionReason()"
+              (input)="correctionReason.set($any($event.target).value)"
+              aria-describedby="correction-reason-help"
+            ></textarea>
+            <small id="correction-reason-help">
+              Il motivo e la versione precedente vengono conservati nella cronologia locale.
+            </small>
+          </label>
+
+          <div class="audio-file-actions">
+            <button type="submit" class="primary submit">
+              {{ editingEventId() ? 'Salva correzione' : 'Salva evento' }}
+            </button>
+            <button *ngIf="editingEventId()" type="button" class="secondary" (click)="cancelEdit()">
+              Annulla modifica
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel list-panel">
+        <div class="section-heading compact">
+          <h2>Diario</h2>
+          <div class="filters">
+            <input
+              type="search"
+              [value]="search()"
+              (input)="search.set($any($event.target).value)"
+              placeholder="Cerca evento"
+              aria-label="Cerca evento"
+            />
+            <select [value]="sortMode()" (change)="sortMode.set($any($event.target).value)">
+              <option value="recent">Più recenti</option>
+              <option value="intensity">Intensità</option>
+              <option value="room">Stanza</option>
+            </select>
+          </div>
+        </div>
+
+        <ul class="event-list" *ngIf="filteredEvents().length; else emptyState">
+          <li
+            *ngFor="let event of filteredEvents()"
+            [class.active]="event.id === selectedEvent()?.id"
+            role="button"
+            tabindex="0"
+            [attr.aria-pressed]="event.id === selectedEvent()?.id"
+            [attr.aria-label]="'Seleziona episodio: ' + event.locationLabel"
+            (click)="selectEvent(event.id)"
+            (keydown)="onEventItemKeydown($event, event.id)"
+          >
+            <div class="event-header">
+              <strong>{{ event.locationLabel }}</strong>
+              <span>{{ labelFor(event.eventType) }}</span>
+            </div>
+            <small>{{ event.room }} · {{ event.startedAt | date: 'dd MMM yyyy, HH:mm' }}</small>
+            <p>{{ event.description || 'Nessuna descrizione inserita.' }}</p>
           </li>
         </ul>
-        <ng-template #noAudio>
-          <p class="empty-audio">Nessuna registrazione associata a questo episodio.</p>
+
+        <ng-template #emptyState>
+          <p class="empty-state">
+            {{
+              accountMode() === 'signed-in'
+                ? 'Nessun episodio nel diario. I nuovi episodi saranno salvati nel tuo account cloud.'
+                : 'Nessun episodio nel diario. Crea un episodio o importa un backup cifrato; i dati restano cifrati su questo dispositivo.'
+            }}
+          </p>
         </ng-template>
       </section>
 
-      <div class="meta-grid">
-        <div>
-          <span>Intensità percepita</span
-          ><strong>{{
-            event.perceivedIntensity === null
-              ? 'Non indicata'
-              : event.perceivedIntensity + '/5 · soggettiva'
-          }}</strong>
+      <aside class="panel detail-panel" *ngIf="selectedEvent() as event">
+        <div class="section-heading compact">
+          <h2>Dettaglio</h2>
+          <span class="status-badge">{{ labelFor(event.status) }}</span>
         </div>
-        <div>
-          <span>Sorgente</span><strong>{{ event.suspectedSource }}</strong>
-        </div>
-        <div>
-          <span>Finestra</span><strong>{{ event.windowsState ?? 'non indicata' }}</strong>
-        </div>
-        <div>
-          <span>Porta</span><strong>{{ event.doorsState ?? 'non indicata' }}</strong>
-        </div>
-      </div>
 
-      <div class="chart-panel">
-        <h4>Analisi frequenze (informativa)</h4>
-        <p class="empty-state">
-          Analisi non disponibile: nessun dato è stato calcolato per questo episodio.
-        </p>
-      </div>
+        <div class="detail-summary">
+          <div class="tag-row">
+            <span class="tag">{{ labelFor(event.eventType) }}</span>
+            <span class="tag secondary">{{ labelFor(event.continuityType) }}</span>
+          </div>
+          <h3>{{ event.locationLabel }}</h3>
+          <p>{{ event.description }}</p>
+        </div>
 
-      <div class="notes-block">
-        <h4>Note</h4>
-        <ul>
-          <li *ngFor="let effect of event.perceivedEffects">{{ labelFor(effect) }}</li>
-        </ul>
-      </div>
+        <div class="audio-file-actions">
+          <button
+            type="button"
+            class="secondary"
+            (click)="beginEdit(event)"
+            aria-label="Modifica episodio"
+          >
+            Modifica episodio
+          </button>
+          <button
+            type="button"
+            class="danger"
+            (click)="deleteEvent(event)"
+            aria-label="Elimina episodio"
+          >
+            Elimina episodio
+          </button>
+        </div>
 
-      <details *ngIf="event.correctionHistory?.length">
-        <summary>Cronologia delle correzioni</summary>
-        <ol>
-          <li *ngFor="let correction of event.correctionHistory">
-            <time [attr.datetime]="correction.changedAt">
-              {{ correction.changedAt | date: 'dd MMM yyyy, HH:mm' }}
-            </time>
-            — {{ correction.reason }}
-          </li>
-        </ol>
-      </details>
-    </aside>
+        <section class="audio-section" aria-labelledby="audio-heading">
+          <div class="audio-heading">
+            <div>
+              <h4 id="audio-heading">Registrazioni audio</h4>
+              <p>
+                {{
+                  accountMode() === 'signed-in'
+                    ? 'Acquisite dal microfono e caricate nello storage privato del tuo account. Non sono cifrate end-to-end.'
+                    : 'Acquisite dal microfono e conservate solo in questo browser.'
+                }}
+              </p>
+            </div>
+            <span *ngIf="recordingActive()" class="recording-indicator" role="status">
+              <span class="recording-dot"></span>
+              {{ recordingPaused() ? 'In pausa' : 'Registrazione attiva' }}
+              · {{ formatDuration(recordingDurationMs()) }}
+            </span>
+          </div>
+
+          <label class="audio-kind">
+            <span>Tipo di registrazione</span>
+            <select
+              [value]="recordingKind()"
+              [disabled]="recordingActive()"
+              (change)="setRecordingKind($any($event.target).value)"
+            >
+              <option value="event">Evento</option>
+              <option value="background">Rumore di fondo</option>
+            </select>
+          </label>
+
+          <p class="audio-consent">
+            La registrazione inizia solo dopo aver premuto il pulsante. Evita di acquisire
+            conversazioni o persone non necessarie. Limite massimo:
+            {{ maxRecordingSeconds / 60 }} minuti o 50 MB.
+            {{
+              accountMode() === 'signed-in'
+                ? 'Al salvataggio, l’audio viene caricato nel tuo account cloud.'
+                : 'Nessun audio viene caricato online.'
+            }}
+          </p>
+
+          <div class="audio-controls">
+            <button
+              *ngIf="!recordingActive()"
+              type="button"
+              class="primary"
+              (click)="startAudioRecording()"
+              [attr.aria-label]="'Avvia registrazione per ' + event.locationLabel"
+            >
+              Avvia registrazione
+            </button>
+            <ng-container *ngIf="recordingActive()">
+              <button
+                *ngIf="!recordingPaused() && recordingPauseSupported()"
+                type="button"
+                class="secondary"
+                (click)="pauseAudioRecording()"
+                aria-label="Metti in pausa la registrazione"
+              >
+                Pausa
+              </button>
+              <button
+                *ngIf="recordingPaused()"
+                type="button"
+                class="secondary"
+                (click)="resumeAudioRecording()"
+                aria-label="Riprendi la registrazione"
+              >
+                Riprendi
+              </button>
+              <button
+                type="button"
+                class="danger"
+                (click)="stopAudioRecording()"
+                aria-label="Ferma e salva la registrazione"
+              >
+                Ferma e salva
+              </button>
+            </ng-container>
+          </div>
+
+          <p *ngIf="audioStatus()" class="audio-status" role="status" aria-live="polite">
+            {{ audioStatus() }}
+          </p>
+          <p *ngIf="audioError()" class="audio-error" role="alert">{{ audioError() }}</p>
+
+          <ul class="audio-list" *ngIf="audioClips().length; else noAudio">
+            <li *ngFor="let clip of audioClips()">
+              <div class="audio-file-heading">
+                <strong>{{ clip.kind === 'background' ? 'Rumore di fondo' : 'Evento' }}</strong>
+                <span>{{ clip.createdAt | date: 'dd MMM yyyy, HH:mm' }}</span>
+              </div>
+              <audio controls preload="none" [src]="getAudioUrl(clip.id)">
+                Il browser non supporta la riproduzione audio.
+              </audio>
+              <div class="audio-meta">
+                <span>{{ formatDuration(clip.durationMs) }}</span>
+                <span>{{ (clip.sizeBytes / 1024 / 1024).toFixed(2) }} MB</span>
+                <span>{{ clip.mimeType }}</span>
+              </div>
+              <details>
+                <summary>Integrità e provenienza</summary>
+                <p>
+                  SHA-256: <code>{{ clip.sha256 }}</code>
+                </p>
+                <p>
+                  Origine: microfono · piattaforma: {{ clip.device.platform || 'non disponibile' }}
+                </p>
+              </details>
+              <div class="audio-file-actions">
+                <button type="button" class="secondary" (click)="downloadAudioClip(clip)">
+                  Scarica copia
+                </button>
+                <button type="button" class="danger" (click)="deleteAudioClip(clip)">Elimina</button>
+              </div>
+            </li>
+          </ul>
+          <ng-template #noAudio>
+            <p class="empty-audio">Nessuna registrazione associata a questo episodio.</p>
+          </ng-template>
+        </section>
+
+        <div class="meta-grid">
+          <div>
+            <span>Intensità percepita</span
+            ><strong>{{
+              event.perceivedIntensity === null
+                ? 'Non indicata'
+                : event.perceivedIntensity + '/5 · soggettiva'
+            }}</strong>
+          </div>
+          <div>
+            <span>Sorgente</span><strong>{{ event.suspectedSource }}</strong>
+          </div>
+          <div>
+            <span>Finestra</span><strong>{{ event.windowsState ?? 'non indicata' }}</strong>
+          </div>
+          <div>
+            <span>Porta</span><strong>{{ event.doorsState ?? 'non indicata' }}</strong>
+          </div>
+        </div>
+
+        <div class="chart-panel">
+          <h4>Analisi frequenze (informativa)</h4>
+          <p class="empty-state">
+            Analisi non disponibile: nessun dato è stato calcolato per questo episodio.
+          </p>
+        </div>
+
+        <div class="notes-block">
+          <h4>Note</h4>
+          <ul>
+            <li *ngFor="let effect of event.perceivedEffects">{{ labelFor(effect) }}</li>
+          </ul>
+        </div>
+
+        <details *ngIf="event.correctionHistory?.length">
+          <summary>Cronologia delle correzioni</summary>
+          <ol>
+            <li *ngFor="let correction of event.correctionHistory">
+              <time [attr.datetime]="correction.changedAt">
+                {{ correction.changedAt | date: 'dd MMM yyyy, HH:mm' }}
+              </time>
+              — {{ correction.reason }}
+            </li>
+          </ol>
+        </details>
+      </aside>
+    </div>
   </main>
 
   <footer class="disclaimer">

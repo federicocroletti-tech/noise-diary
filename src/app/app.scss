@@ -1,4 +1,4 @@
-﻿:host {
+:host {
   display: block;
   min-height: 100vh;
   color: var(--text);
@@ -48,8 +48,14 @@ h1 {
 }
 
 .layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.9fr) minmax(300px, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
   gap: 20px;
   align-items: start;
 }
@@ -63,7 +69,6 @@ h1 {
 }
 
 .storage-message {
-  grid-column: 1 / -1;
   color: #fecaca;
   border-color: rgba(248, 113, 113, 0.4);
 }
@@ -106,13 +111,8 @@ h1 {
 }
 
 .import-message {
-  grid-column: 1 / -1;
   color: #bbf7d0;
   border-color: rgba(74, 222, 128, 0.4);
-}
-
-.import-review {
-  grid-column: 1 / -1;
 }
 
 .recovery-code {
@@ -132,7 +132,6 @@ h1 {
 }
 
 .overview {
-  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
@@ -161,12 +160,6 @@ h1 {
 
 .stat-card.highlight {
   background: linear-gradient(135deg, rgba(110, 231, 249, 0.15), rgba(45, 212, 191, 0.1));
-}
-
-.form-panel,
-.list-panel,
-.detail-panel {
-  min-height: 100%;
 }
 
 .section-heading {
@@ -525,10 +518,6 @@ small {
 }
 
 @media (max-width: 980px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-
   .topbar,
   .section-heading,
   .header-actions {

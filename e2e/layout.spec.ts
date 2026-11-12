@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openLocalDiary } from './fixtures';
+import { createEpisode, openLocalDiary } from './fixtures';
 
 test.describe('Layout e stili di base', () => {
   test('la pagina non ha bordi chiari e usa controlli nativi scuri', async ({ page }) => {
@@ -31,5 +31,28 @@ test.describe('Layout e stili di base', () => {
     await expect(location).toBeFocused();
     const boxShadow = await location.evaluate((element) => getComputedStyle(element).boxShadow);
     expect(boxShadow).not.toBe('none');
+  });
+
+  test('i pannelli occupano tutta la larghezza senza colonne vuote', async ({ page }) => {
+    await openLocalDiary(page);
+    const workspace = page.locator('.workspace');
+    const gapToRightEdge = async () => {
+      const workspaceBox = (await workspace.boundingBox())!;
+      const lastPanel = (await workspace.locator(':scope > .panel').last().boundingBox())!;
+      return Math.abs(lastPanel.x + lastPanel.width - (workspaceBox.x + workspaceBox.width));
+    };
+
+    expect(await gapToRightEdge()).toBeLessThan(2);
+
+    await createEpisode(page, { location: 'Cucina' });
+    await page.locator('.event-list li').first().click();
+    await expect(page.locator('.detail-panel')).toBeVisible();
+    expect(await gapToRightEdge()).toBeLessThan(2);
+  });
+
+  test('il pannello lista non si allunga oltre il suo contenuto', async ({ page }) => {
+    await openLocalDiary(page);
+    const listBox = (await page.locator('.list-panel').boundingBox())!;
+    expect(listBox.height).toBeLessThan(300);
   });
 });
