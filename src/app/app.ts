@@ -119,6 +119,10 @@ const EMPTY_DRAFT: NoiseEventDraft = {
   imports: [CommonModule],
   templateUrl: './app.html',
   styleUrl: './app.scss',
+  host: {
+    '(document:click)': 'closeMenus($event)',
+    '(document:keydown.escape)': 'closeMenus()',
+  },
 })
 export class App implements OnDestroy {
   private readonly injector = inject(Injector);
@@ -1023,10 +1027,22 @@ export class App implements OnDestroy {
   }
 
   protected toggleForm(): void {
-    if (this.editingEventId()) {
+    if (this.showForm()) {
+      if (!this.editingEventId()) {
+        this.showForm.set(false);
+      }
       return;
     }
-    this.showForm.update((value) => !value);
+    this.openNewEpisode();
+  }
+
+  protected closeMenus(event?: Event): void {
+    const target = event?.target;
+    document.querySelectorAll<HTMLDetailsElement>('details.menu[open]').forEach((menu) => {
+      if (!(target instanceof Node && menu.contains(target))) {
+        menu.open = false;
+      }
+    });
   }
 
   protected openNewEpisode(): void {
