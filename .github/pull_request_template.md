@@ -25,5 +25,6 @@
 - [ ] `npm run content:check`
 - [ ] `npm run lint`
 - [ ] `npm test`
+- [ ] `npm run e2e`
 - [ ] `npm run build`
 - [ ] Ho provato i link e rivisto l'accessibilità della documentazione.
