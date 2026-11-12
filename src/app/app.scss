@@ -140,33 +140,41 @@ h1 {
 
 .overview {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .stat-card {
   background: var(--panel-soft);
   border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 18px 20px;
+  border-radius: 16px;
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .stat-card .label {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
 }
 
 .stat-card strong {
-  font-size: clamp(1.4rem, 2vw, 2.2rem);
+  font-size: clamp(1.25rem, 1.8vw, 1.6rem);
 }
 
-.stat-card.highlight {
-  background: linear-gradient(135deg, rgba(110, 231, 249, 0.15), rgba(45, 212, 191, 0.1));
+.stat-card small {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.stat-card .empty-value {
+  color: var(--muted);
+  font-size: 1rem;
+  font-weight: 500;
 }
 
 .section-heading {
@@ -551,6 +559,10 @@ small {
     width: 100%;
     justify-content: flex-start;
   }
+
+  .overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -569,10 +581,6 @@ small {
   .header-actions .menu-panel {
     left: 0;
     right: 0;
-  }
-
-  .overview {
-    grid-template-columns: 1fr;
   }
 
   .two-columns,
