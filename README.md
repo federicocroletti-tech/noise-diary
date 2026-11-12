@@ -107,7 +107,11 @@ npm run content:check
 npm run lint
 npm test
 npm run build
+npx playwright install chromium  # solo la prima volta
+npm run e2e
 ```
+
+`npm run e2e` avvia l'app su `localhost:4317` e verifica con Playwright i flussi del diario locale (desktop e mobile), bloccando ogni richiesta verso Neon.
 
 Il workflow pull request non richiede segreti, non carica file degli utenti e valida contenuti, formattazione, test e build. La configurazione amministrativa delle regole di protezione branch è descritta in [GOVERNANCE.md](./GOVERNANCE.md).
 

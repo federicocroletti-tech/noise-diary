@@ -33,6 +33,8 @@ npm run content:check
 npm run lint
 npm test
 npm run build
+npx playwright install chromium  # solo la prima volta
+npm run e2e
 ```
 
 Se modifichi metadati di una situazione, rigenera l'indice con `npm run content:check -- --write-index`, poi riesegui i controlli.
