@@ -983,6 +983,36 @@ describe('App', () => {
     expect(compiled.querySelectorAll('.event-list li')).toHaveLength(1);
   });
 
+  it('summarizes recent activity in the overview', async () => {
+    const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+    const baseEvent = {
+      createdAt: daysAgo(40),
+      updatedAt: daysAgo(40),
+      locationLabel: 'Cucina',
+      room: '',
+      eventType: 'HUM',
+      continuityType: 'unknown',
+      perceivedEffects: ['simple-observation'],
+      suspectedSource: 'Non identificata (ipotesi)',
+      description: 'Sintetico.',
+      notes: '',
+      status: 'draft',
+      tags: [],
+      attachmentIds: [],
+    };
+    storage.loadEvents.mockResolvedValue([
+      { ...baseEvent, id: 'recent', startedAt: daysAgo(2), perceivedIntensity: 4 },
+      { ...baseEvent, id: 'old', startedAt: daysAgo(30), perceivedIntensity: 2 },
+    ]);
+    const fixture = await createLocalFixture();
+    await createVault(fixture);
+
+    const values = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll('.stat-card strong'),
+    ].map((value) => value.textContent?.replace(/\s+/g, ' ').trim());
+    expect(values).toEqual(['2', '1', expect.stringMatching(/^\d{2} \w+, \d{2}:\d{2}$/), '3.0 /5']);
+  });
+
   it('preserves unreported intensity and effects when correcting another field', async () => {
     const existingEvent = {
       id: 'event-with-unreported-values',

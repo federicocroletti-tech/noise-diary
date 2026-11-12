@@ -194,6 +194,19 @@ export class App implements OnDestroy {
     return (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1);
   });
 
+  protected readonly recentEventCount = computed(() => {
+    const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return this.events().filter((event) => Date.parse(event.startedAt) >= since).length;
+  });
+
+  protected readonly latestEventAt = computed(() =>
+    this.events().reduce<string | null>(
+      (latest, event) =>
+        latest === null || Date.parse(event.startedAt) > Date.parse(latest) ? event.startedAt : latest,
+      null,
+    ),
+  );
+
   protected readonly filteredEvents = computed(() => {
     const query = this.search().trim().toLowerCase();
     const sorted = [...this.events()].filter((event) => {

@@ -55,4 +55,22 @@ test.describe('Layout e stili di base', () => {
     const listBox = (await page.locator('.list-panel').boundingBox())!;
     expect(listBox.height).toBeLessThan(300);
   });
+
+  test('il riepilogo è una griglia compatta di quattro indicatori', async ({ page }) => {
+    await openLocalDiary(page);
+    const overview = page.locator('.overview');
+    await expect(overview).not.toHaveClass(/panel/);
+    const cards = overview.locator('.stat-card');
+    await expect(cards).toHaveCount(4);
+    await expect(cards.nth(3)).toContainText('Non disponibile');
+
+    const tops = new Set(
+      await cards.evaluateAll((elements) =>
+        elements.map((element) => Math.round(element.getBoundingClientRect().top)),
+      ),
+    );
+    const isMobile = page.viewportSize()!.width < 640;
+    expect(tops.size).toBe(isMobile ? 2 : 1);
+    expect((await overview.boundingBox())!.height).toBeLessThan(isMobile ? 220 : 120);
+  });
 });

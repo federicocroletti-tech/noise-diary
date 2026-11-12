@@ -517,18 +517,27 @@
   </p>
 
   <main class="layout" *ngIf="diaryOpen() && !recoveryCode() && !deletingDiary()">
-    <section class="overview panel">
+    <section class="overview" aria-label="Riepilogo del diario">
       <div class="stat-card">
-        <span class="label">Eventi</span>
+        <span class="label">Episodi</span>
         <strong>{{ events().length }}</strong>
       </div>
       <div class="stat-card">
-        <span class="label">Media percepita</span>
-        <strong>{{ averageIntensity() }}</strong>
+        <span class="label">Ultimi 7 giorni</span>
+        <strong>{{ recentEventCount() }}</strong>
       </div>
-      <div class="stat-card highlight">
-        <span class="label">Stato</span>
-        <strong>{{ accountMode() === 'signed-in' ? 'Account' : 'Locale' }}</strong>
+      <div class="stat-card">
+        <span class="label">Ultimo episodio</span>
+        <strong *ngIf="latestEventAt() as latest; else noLatest">{{
+          latest | date: 'dd MMM, HH:mm'
+        }}</strong>
+        <ng-template #noLatest><strong class="empty-value">Nessuno</strong></ng-template>
+      </div>
+      <div class="stat-card">
+        <span class="label">Intensit? media</span>
+        <strong [class.empty-value]="averageIntensity() === 'Non disponibile'"
+          >{{ averageIntensity() }}<small *ngIf="averageIntensity() !== 'Non disponibile'"> /5</small></strong
+        >
       </div>
     </section>
 
