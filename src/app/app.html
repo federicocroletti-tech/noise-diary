@@ -15,25 +15,29 @@
 
     <div class="header-actions" *ngIf="diaryOpen() && !recoveryCode()">
       <button
-        *ngIf="accountMode() === 'local'"
         type="button"
-        class="secondary"
-        [disabled]="authBusy()"
-        (click)="showProfiles()"
-      >
-        Cambia profilo
-      </button>
-      <button
-        type="button"
-        class="secondary"
+        [class.primary]="!showForm()"
+        [class.secondary]="showForm()"
         (click)="toggleForm()"
         [disabled]="editingEventId() !== null || authBusy()"
       >
         {{ showForm() ? 'Nascondi modulo' : 'Nuovo episodio' }}
       </button>
-      <button type="button" class="secondary" [disabled]="authBusy()" (click)="importInput.click()">
-        Importa backup (aggiungi)
-      </button>
+
+      <details class="menu">
+        <summary class="secondary">Backup</summary>
+        <div class="menu-panel" (click)="closeMenus()">
+          <button type="button" class="menu-item" [disabled]="authBusy()" (click)="downloadExport()">
+            Esporta backup cifrato
+          </button>
+          <button type="button" class="menu-item" [disabled]="authBusy()" (click)="importInput.click()">
+            Importa backup (aggiungi)
+          </button>
+          <button type="button" class="menu-item" [disabled]="authBusy()" (click)="replaceInput.click()">
+            Ripristina backup
+          </button>
+        </div>
+      </details>
       <input
         #importInput
         class="visually-hidden"
@@ -41,14 +45,6 @@
         accept=".ndbackup,.json,application/json"
         (change)="importDiary($event, 'append')"
       />
-      <button
-        type="button"
-        class="secondary"
-        [disabled]="authBusy()"
-        (click)="replaceInput.click()"
-      >
-        Ripristina backup
-      </button>
       <input
         #replaceInput
         class="visually-hidden"
@@ -56,48 +52,61 @@
         accept=".ndbackup,.json,application/json"
         (change)="importDiary($event, 'replace')"
       />
-      <button type="button" class="primary" [disabled]="authBusy()" (click)="downloadExport()">
-        Esporta backup cifrato
-      </button>
-      <button
-        *ngIf="accountMode() === 'local'"
-        type="button"
-        class="secondary"
-        [disabled]="authBusy()"
-        (click)="rotateRecoveryKey()"
-      >
-        Rigenera chiave di recupero
-      </button>
-      <button type="button" class="danger" [disabled]="authBusy()" (click)="deleteLocalDiary()">
-        {{ accountMode() === 'signed-in' ? 'Elimina diario account' : 'Elimina diario locale' }}
-      </button>
-      <button
-        *ngIf="accountMode() === 'signed-in'"
-        type="button"
-        class="secondary"
-        [disabled]="accountBusy()"
-        (click)="signOutAccount()"
-      >
-        Esci
-      </button>
-      <button
-        *ngIf="accountMode() === 'local'"
-        type="button"
-        class="secondary"
-        [disabled]="authBusy()"
-        (click)="lockDiary()"
-      >
-        Blocca
-      </button>
-      <button
-        *ngIf="accountMode() === 'local'"
-        type="button"
-        class="secondary"
-        [disabled]="authBusy()"
-        (click)="returnToAccount()"
-      >
-        Torna all’account
-      </button>
+
+      <details class="menu">
+        <summary class="secondary">{{ accountMode() === 'signed-in' ? 'Account' : 'Profilo' }}</summary>
+        <div class="menu-panel" (click)="closeMenus()">
+          <button
+            *ngIf="accountMode() === 'local'"
+            type="button"
+            class="menu-item"
+            [disabled]="authBusy()"
+            (click)="lockDiary()"
+          >
+            Blocca
+          </button>
+          <button
+            *ngIf="accountMode() === 'local'"
+            type="button"
+            class="menu-item"
+            [disabled]="authBusy()"
+            (click)="showProfiles()"
+          >
+            Cambia profilo
+          </button>
+          <button
+            *ngIf="accountMode() === 'local'"
+            type="button"
+            class="menu-item"
+            [disabled]="authBusy()"
+            (click)="rotateRecoveryKey()"
+          >
+            Rigenera chiave di recupero
+          </button>
+          <button
+            *ngIf="accountMode() === 'local'"
+            type="button"
+            class="menu-item"
+            [disabled]="authBusy()"
+            (click)="returnToAccount()"
+          >
+            Torna all?account
+          </button>
+          <button
+            *ngIf="accountMode() === 'signed-in'"
+            type="button"
+            class="menu-item"
+            [disabled]="accountBusy()"
+            (click)="signOutAccount()"
+          >
+            Esci
+          </button>
+          <hr />
+          <button type="button" class="menu-item danger" [disabled]="authBusy()" (click)="deleteLocalDiary()">
+            {{ accountMode() === 'signed-in' ? 'Elimina diario account?' : 'Elimina diario locale?' }}
+          </button>
+        </div>
+      </details>
     </div>
   </header>
 
