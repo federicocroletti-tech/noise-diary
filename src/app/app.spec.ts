@@ -832,6 +832,9 @@ describe('App', () => {
     });
     expect(compiled.textContent).toContain('Registrazioni audio');
     expect(compiled.querySelector('button[aria-label^="Avvia registrazione per"]')).not.toBeNull();
+    expect(compiled.querySelector('.event-list .event-header span')?.textContent?.trim()).toBe(
+      'Ronzio',
+    );
   });
 
   it('saves an edit with its reason and previous event snapshot', async () => {

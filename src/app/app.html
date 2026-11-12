@@ -852,7 +852,7 @@
         >
           <div class="event-header">
             <strong>{{ event.locationLabel }}</strong>
-            <span>{{ event.eventType }}</span>
+            <span>{{ labelFor(event.eventType) }}</span>
           </div>
           <small>{{ event.room }} · {{ event.startedAt | date: 'dd MMM yyyy, HH:mm' }}</small>
           <p>{{ event.description || 'Nessuna descrizione inserita.' }}</p>
