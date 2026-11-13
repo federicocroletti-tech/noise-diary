@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { AudioClipRepository } from './audio/audio-clip.repository';
 import { LocalVaultService } from './services/local-vault.service';
 import { LocalBackupService } from './services/local-backup.service';
@@ -10,6 +11,7 @@ import { NeonDiaryService } from './services/neon-diary.service';
 import { NoiseEvent } from './domain/noise-event.model';
 import { AudioClip } from './audio/models/audio-clip.model';
 import { App } from './app';
+import { routes } from './app.routes';
 
 describe('App', () => {
   const defaultProfile: LocalDiaryProfile = {
@@ -197,6 +199,7 @@ describe('App', () => {
     await TestBed.configureTestingModule({
       imports: [App],
       providers: [
+        provideRouter(routes),
         { provide: NoiseStorageService, useValue: storage },
         { provide: LocalVaultService, useValue: vault },
         { provide: LocalBackupService, useValue: backup },
@@ -754,6 +757,80 @@ describe('App', () => {
     expect(savedEvents).not.toHaveBeenCalled();
   });
 
+  it('groups the form fields and labels required inputs', async () => {
+    const fixture = await createLocalFixture();
+    await createVault(fixture);
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const groups = [...compiled.querySelectorAll('.event-form fieldset')].map(
+      (group) => group.querySelector('legend')?.textContent?.trim(),
+    );
+    expect(groups).toEqual(['Quando', 'Dove', 'Cosa hai percepito', 'Contesto']);
+    expect(compiled.querySelector<HTMLInputElement>('.event-form input[type="datetime-local"]')?.required)
+      .toBe(true);
+    expect(compiled.querySelector<HTMLParagraphElement>('.form-required-note')).not.toBeNull();
+    expect(compiled.querySelector('#episode-location-help')?.textContent).toContain(
+      'Dove hai percepito il rumore?',
+    );
+    expect(compiled.querySelector('#episode-room-help')?.textContent).toContain(
+      'La stanza in cui ti trovavi',
+    );
+    expect(compiled.querySelectorAll<HTMLSelectElement>('.event-form select')[1].value).toBe(
+      'unknown',
+    );
+    expect(compiled.querySelectorAll<HTMLSelectElement>('.event-form select')[2].value).toBe(
+      'simple-observation',
+    );
+  });
+
+  it('preserves imported free-text window and door states when editing', async () => {
+    storage.loadEvents.mockResolvedValue([
+      {
+        id: 'event-with-free-text-opening-state',
+        startedAt: '2026-10-22T22:04:00.000Z',
+        createdAt: '2026-10-22T22:05:00.000Z',
+        updatedAt: '2026-10-22T22:05:00.000Z',
+        locationLabel: 'Test location',
+        room: 'Soggiorno',
+        windowsState: 'apertura a vasistas',
+        doorsState: 'socchiusa di pochi centimetri',
+        eventType: 'UNKNOWN',
+        continuityType: 'unknown',
+        perceivedIntensity: 2,
+        perceivedEffects: ['simple-observation'],
+        suspectedSource: 'Non identificata (ipotesi)',
+        description: 'Originale.',
+        notes: '',
+        status: 'to-review',
+        tags: [],
+        attachmentIds: [],
+      },
+    ]);
+    const fixture = await createLocalFixture();
+    await createVault(fixture);
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    compiled.querySelector<HTMLElement>('.event-list li')?.click();
+    fixture.detectChanges();
+    compiled.querySelector<HTMLButtonElement>('button[aria-label="Modifica episodio"]')?.click();
+    fixture.detectChanges();
+
+    expect(compiled.querySelector<HTMLInputElement>('#episode-location')?.value).toBe(
+      'Test location',
+    );
+    const contextSelects = compiled.querySelectorAll<HTMLSelectElement>(
+      '.field-group:last-of-type select',
+    );
+    expect(contextSelects[0].value).toBe('apertura a vasistas');
+    expect(contextSelects[0].selectedOptions[0].textContent).toContain(
+      'Valore salvato: apertura a vasistas',
+    );
+    expect(contextSelects[1].value).toBe('socchiusa di pochi centimetri');
+    expect(contextSelects[1].selectedOptions[0].textContent).toContain(
+      'Valore salvato: socchiusa di pochi centimetri',
+    );
+  });
+
   it('creates a named local profile before creating its password vault', async () => {
     savedProfiles = [];
     const fixture = await createLocalFixture();
@@ -1099,6 +1176,20 @@ describe('App', () => {
     expect(storage.deleteEvent).toHaveBeenCalledWith(existingEvent.id);
     expect(compiled.textContent).toContain('Nessun episodio nel diario');
     expect(compiled.textContent).toContain('eliminati dall’archivio di questo browser');
+  });
+
+  it('offers import instructions and a downloadable JSON template in the open diary', async () => {
+    const fixture = await createLocalFixture();
+    await createVault(fixture);
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const guide = compiled.querySelector<HTMLDetailsElement>('.import-guide');
+    expect(guide).not.toBeNull();
+    expect(guide?.querySelector('summary')?.textContent).toContain('Come importare');
+    const templateLink = guide?.querySelector<HTMLAnchorElement>('a[download]');
+    expect(templateLink?.getAttribute('href')).toBe('modello-importazione-diario.json');
+    expect(templateLink?.download).toBe('modello-importazione-diario.json');
+    expect(guide?.textContent).toContain('gli audio esistenti vengono eliminati');
   });
 
   it('imports validated events into encrypted local history and skips existing IDs', async () => {

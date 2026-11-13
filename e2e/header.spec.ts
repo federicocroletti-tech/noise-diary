@@ -1,5 +1,32 @@
 import { expect, test } from '@playwright/test';
-import { openLocalDiary } from './fixtures';
+import { isolateFromCloud, openLocalDiary } from './fixtures';
+
+test('la guida è accessibile senza login anche da un collegamento diretto', async ({ page }) => {
+  await isolateFromCloud(page);
+  await page.goto('/#/guida');
+  await expect(page.getByRole('heading', { name: 'Guida all’uso di Diario Rumore' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Accedi al tuo diario' })).toBeHidden();
+
+  await page
+    .getByRole('navigation', { name: 'Indice della guida' })
+    .getByRole('link', { name: 'Backup e importazione' })
+    .click();
+  await expect(page).toHaveURL(/#\/guida#backup$/);
+  await expect(
+    page.getByRole('heading', { name: '6. Esporta un backup o importa dati' }),
+  ).toBeInViewport();
+
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: '6. Esporta un backup o importa dati' }),
+  ).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    await page.evaluate(() => document.documentElement.clientWidth),
+  );
+
+  await page.locator('header.topbar').getByRole('link', { name: 'Torna all’app' }).click();
+  await expect(page.getByRole('heading', { name: 'Accedi al tuo diario' })).toBeVisible();
+});
 
 test.describe('Intestazione', () => {
   test.beforeEach(async ({ page }) => {
@@ -46,5 +73,34 @@ test.describe('Intestazione', () => {
     await page.getByRole('button', { name: 'Nuovo episodio' }).click();
 
     await expect(page.locator('form.event-form').getByLabel('Luogo')).toBeFocused();
+  });
+
+  test('la guida mantiene il modulo in compilazione e offre il modello importabile', async ({
+    page,
+  }) => {
+    const form = page.locator('form.event-form');
+    await form.getByLabel('Luogo').fill('Luogo sintetico da conservare');
+    await form.getByLabel('Descrizione').fill('Appunti sintetici non ancora salvati.');
+    await page.locator('header.topbar').getByRole('link', { name: 'Guida all’uso' }).click();
+
+    await expect(
+      page.getByRole('heading', { name: 'Guida all’uso di Diario Rumore' }),
+    ).toBeFocused();
+    await expect(page.locator('main.layout')).toBeHidden();
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('link', { name: 'Scarica il modello JSON compilabile' }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe('modello-importazione-diario.json');
+    expect(await download.failure()).toBeNull();
+
+    await page.locator('header.topbar').getByRole('link', { name: 'Torna all’app' }).click();
+    await expect(form.getByLabel('Luogo')).toHaveValue('Luogo sintetico da conservare');
+    await expect(form.getByLabel('Descrizione')).toHaveValue(
+      'Appunti sintetici non ancora salvati.',
+    );
+    await form.getByRole('button', { name: 'Salva evento' }).click();
+    await expect(
+      page.locator('.event-list li').filter({ hasText: 'Luogo sintetico da conservare' }),
+    ).toBeVisible();
   });
 });

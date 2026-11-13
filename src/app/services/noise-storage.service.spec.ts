@@ -4,6 +4,7 @@ import { NoiseEvent } from '../domain/noise-event.model';
 import { NoiseEventRepository } from './noise-event.repository';
 import { LocalVaultService } from './local-vault.service';
 import { NoiseStorageService } from './noise-storage.service';
+import importTemplate from '../../../public/modello-importazione-diario.json';
 
 describe('NoiseStorageService', () => {
   const repositories: NoiseEventRepository[] = [];
@@ -43,6 +44,17 @@ describe('NoiseStorageService', () => {
 
   beforeEach(() => {
     localStorage.clear();
+  });
+
+  it('accepts and persists the downloadable import template without changes', async () => {
+    const storage = await createStorage();
+    const events = storage.parseImport(JSON.parse(JSON.stringify(importTemplate)));
+
+    await storage.saveEvents(events);
+
+    expect(await storage.loadEvents()).toEqual(events);
+    expect(events).toHaveLength(1);
+    expect(events[0].attachmentIds).toEqual([]);
   });
 
   afterEach(async () => {

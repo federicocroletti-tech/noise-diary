@@ -1,0 +1,318 @@
+<main class="user-guide" aria-labelledby="user-guide-title">
+  <section class="guide-intro">
+    <p class="eyebrow">Dall’accesso al primo backup</p>
+    <h2 id="user-guide-title" #guideTitle tabindex="-1">Guida all’uso di Diario Rumore</h2>
+    <p>
+      Annota ciò che hai percepito, aggiungi il contesto e ritrova gli episodi nel tempo.
+      L’intensità è una valutazione soggettiva: l’app non è un fonometro e non accerta la sorgente o
+      le responsabilità di un rumore.
+    </p>
+    <p>
+      Puoi consultare questa pagina senza accedere. Usa <strong>Torna all’app</strong> per
+      riprendere il lavoro: aprire la guida non cancella il modulo in compilazione. Un ricaricamento
+      o la chiusura della pagina, invece, può far perdere dati non salvati.
+    </p>
+  </section>
+
+  <nav class="guide-index" aria-label="Indice della guida">
+    <h3>In questa guida</h3>
+    <ol>
+      <li><a routerLink="/guida" fragment="primi-passi">Primi passi</a></li>
+      <li><a routerLink="/guida" fragment="account-e-profili">Account o diario locale</a></li>
+      <li><a routerLink="/guida" fragment="nuovo-episodio">Annotare un episodio</a></li>
+      <li><a routerLink="/guida" fragment="consultare">Cercare e correggere</a></li>
+      <li><a routerLink="/guida" fragment="audio">Registrare audio</a></li>
+      <li><a routerLink="/guida" fragment="backup">Backup e importazione</a></li>
+      <li><a routerLink="/guida" fragment="recupero">Password e recupero</a></li>
+      <li><a routerLink="/guida" fragment="privacy">Privacy e limiti</a></li>
+      <li><a routerLink="/guida" fragment="problemi">Risolvere i problemi comuni</a></li>
+    </ol>
+  </nav>
+
+  <section id="primi-passi" class="guide-section" aria-labelledby="primi-passi-title">
+    <h3 id="primi-passi-title">1. Primi passi</h3>
+    <ol>
+      <li>Scegli se usare un account online o un diario locale in questo browser.</li>
+      <li>Apri <strong>Nuovo episodio</strong> e controlla data e ora di inizio.</li>
+      <li>Compila luogo, percezione e contesto, poi premi <strong>Salva evento</strong>.</li>
+      <li>Seleziona l’episodio nel diario per rivederlo o aggiungere una registrazione audio.</li>
+      <li>
+        Dal menu <strong>Backup</strong>, esporta una copia cifrata e conservala privatamente.
+      </li>
+    </ol>
+    <p class="guide-note">
+      I dati non compilati non vanno inventati. Se non conosci la sorgente, lascia il campo vuoto;
+      distingui sempre osservazioni dirette e ipotesi.
+    </p>
+  </section>
+
+  <section id="account-e-profili" class="guide-section" aria-labelledby="account-e-profili-title">
+    <h3 id="account-e-profili-title">2. Scegli dove conservare il diario</h3>
+    <div class="storage-options">
+      <article>
+        <h4>Account online</h4>
+        <p>Per ritrovare episodi e audio su più dispositivi accedendo allo stesso account.</p>
+        <ol>
+          <li>
+            Premi <strong>Crea account</strong> e inserisci email e password di almeno 12 caratteri.
+          </li>
+          <li>Conferma la password e verifica l’email con il codice ricevuto.</li>
+          <li>Accedi con email e password. Per sincronizzare serve una connessione.</li>
+        </ol>
+        <p>
+          Eventi e audio sono trasferiti ai servizi cloud dell’account. L’accesso è riservato
+          all’account, ma i dati non sono cifrati end-to-end dall’app. Usa
+          <strong>Account → Esci</strong> sui dispositivi condivisi.
+        </p>
+      </article>
+      <article>
+        <h4>Diario locale</h4>
+        <p>Per conservare i dati cifrati solo in questo browser, senza sincronizzazione.</p>
+        <ol>
+          <li>
+            Dalla schermata di accesso scegli
+            <strong>Apri diario salvato in questo browser</strong>.
+          </li>
+          <li>Crea un profilo con un nome riconoscibile oppure scegli un profilo esistente.</li>
+          <li>Al primo utilizzo imposta una password di almeno 12 caratteri.</li>
+          <li>Conserva la chiave di recupero separatamente e conferma di averla salvata.</li>
+        </ol>
+        <p>
+          I profili locali sono archivi distinti, non account. Usa <strong>Profilo → Blocca</strong>
+          quando ti allontani. Cambiare browser o cancellarne i dati non trasferisce il diario:
+          esporta prima un backup ed evita la navigazione privata per conservarlo nel tempo.
+        </p>
+      </article>
+    </div>
+    <p>
+      Un diario locale non viene importato automaticamente nell’account. Per trasferirlo, sblocca il
+      profilo locale, esporta un backup cifrato, accedi all’account e importalo. Verifica il
+      risultato prima di eliminare l’originale.
+    </p>
+  </section>
+
+  <section id="nuovo-episodio" class="guide-section" aria-labelledby="nuovo-episodio-title">
+    <h3 id="nuovo-episodio-title">3. Annota un episodio</h3>
+    <p>
+      Il modulo è organizzato in quattro gruppi. I campi obbligatori sono segnati con un asterisco.
+    </p>
+    <ul>
+      <li>
+        <strong>Quando:</strong> data e ora di inizio sono obbligatorie. La durata è facoltativa,
+        espressa in minuti e deve essere maggiore di zero.
+      </li>
+      <li>
+        <strong>Dove:</strong> indica il luogo in cui hai percepito il rumore e, se utile, la
+        stanza. Non è necessario inserire un indirizzo preciso.
+      </li>
+      <li>
+        <strong>Cosa hai percepito:</strong> scegli tipologia, intensità da 1 a 5, andamento,
+        effetto e stato dell’episodio. L’intensità non rappresenta decibel.
+      </li>
+      <li>
+        <strong>Contesto:</strong> aggiungi un’eventuale sorgente sospetta, condizione di finestra e
+        porta, descrizione, note e tag separati da virgole. La sorgente è salvata come ipotesi, non
+        come fatto accertato.
+      </li>
+    </ul>
+    <p>
+      Esempio di descrizione: «Ronzio intermittente percepito dalla camera per circa dieci minuti;
+      finestra chiusa. Sorgente non identificata».
+    </p>
+    <p class="guide-note">
+      Premi <strong>Salva evento</strong> anche se scegli lo stato <strong>Bozza</strong>. Il modulo
+      non viene salvato automaticamente. Controlla che l’episodio compaia nel diario e verifica
+      eventuali messaggi di errore prima di chiudere la pagina.
+    </p>
+  </section>
+
+  <section id="consultare" class="guide-section" aria-labelledby="consultare-title">
+    <h3 id="consultare-title">4. Cerca, correggi o elimina un episodio</h3>
+    <p>
+      La ricerca trova testi in luogo, stanza, descrizione, note, sorgente sospetta e tag. Puoi
+      ordinare per episodi più recenti, intensità o stanza. Se non trovi un episodio, svuota la
+      ricerca e verifica di essere nell’account o profilo corretto.
+    </p>
+    <p>
+      Seleziona un episodio per aprire il dettaglio. Con <strong>Modifica episodio</strong> puoi
+      correggere i dati; indica il <strong>Motivo della modifica</strong> e premi
+      <strong>Salva correzione</strong>. La cronologia conserva motivo e versione precedente.
+      <strong>Annulla modifica</strong> non applica la correzione.
+    </p>
+    <p>
+      <strong>Elimina episodio</strong> rimuove l’episodio e i relativi audio dopo conferma: dal
+      cloud nell’account online, dal profilo attivo nella modalità locale. Non c’è un cestino di
+      recupero; le copie già esportate non vengono eliminate.
+    </p>
+  </section>
+
+  <section id="audio" class="guide-section" aria-labelledby="audio-title">
+    <h3 id="audio-title">5. Registra e riascolta un audio</h3>
+    <ol>
+      <li>
+        Salva e seleziona un episodio; nel dettaglio apri la sezione
+        <strong>Registrazioni audio</strong>.
+      </li>
+      <li>Scegli <strong>Evento</strong> oppure <strong>Rumore di fondo</strong>.</li>
+      <li>Premi <strong>Avvia registrazione</strong> e autorizza il microfono nel browser.</li>
+      <li>Se il browser lo supporta, usa <strong>Pausa</strong> e <strong>Riprendi</strong>.</li>
+      <li>
+        Premi <strong>Ferma e salva</strong> e verifica che la registrazione compaia nell’elenco.
+      </li>
+    </ol>
+    <p>
+      Il limite per registrazione è di 5 minuti o 50 MB. Ferma e salva prima di cambiare episodio,
+      aprire la guida o uscire. Per registrare servono un browser compatibile, un microfono e una
+      pagina HTTPS (oppure localhost durante lo sviluppo).
+    </p>
+    <p>
+      Puoi riascoltare l’audio, usare <strong>Scarica copia</strong> o eliminarlo. Nell’account
+      l’audio è caricato nel cloud; nel diario locale resta cifrato nel browser. Evita conversazioni
+      e persone non necessarie. Le registrazioni non sono misurazioni fonometriche professionali;
+      l’analisi delle frequenze non è attualmente disponibile.
+    </p>
+  </section>
+
+  <section id="backup" class="guide-section" aria-labelledby="backup-title">
+    <h3 id="backup-title">6. Esporta un backup o importa dati</h3>
+    <h4>Salva una copia cifrata</h4>
+    <p>
+      Scegli <strong>Backup → Esporta backup cifrato</strong>. Il file <code>.ndbackup</code>
+      include episodi e registrazioni audio. Nell’account scegli e conferma una passphrase dedicata
+      di almeno 12 caratteri, diversa come funzione dalla password di login; nella modalità locale
+      viene richiesta la password del profilo. Conserva file e password separatamente: il backup non
+      si aggiorna automaticamente.
+    </p>
+    <h4>Importa senza cancellare il diario</h4>
+    <p>
+      Scegli <strong>Backup → Importa file (aggiungi)</strong> e seleziona un
+      <code>.ndbackup</code> oppure un <code>.json</code>, fino a 120 MiB. Per il backup cifrato
+      inserisci la password usata all’esportazione. Gli episodi identici con lo stesso ID vengono
+      saltati; per versioni diverse scegli quale mantenere e conferma l’importazione.
+    </p>
+    <h4>Prepara un JSON a mano</h4>
+    <ol>
+      <li>
+        <a href="modello-importazione-diario.json" download="modello-importazione-diario.json">
+          Scarica il modello JSON compilabile
+        </a>
+        e sostituisci i dati fittizi con i tuoi.
+      </li>
+      <li>
+        Conserva tutti i campi del modello. Per più episodi duplica l’oggetto nell’elenco
+        <code>events</code>, separa gli oggetti con virgole e assegna ID distinti.
+      </li>
+      <li>
+        Usa date con fuso, per esempio <code>2026-11-12T22:30:00+01:00</code> (<code>+02:00</code>
+        per l’ora legale italiana, <code>Z</code> per UTC). L’intensità è un intero da 1 a 5 oppure
+        <code>null</code>. La sorgente sospetta deve contenere la parola <strong>ipotesi</strong>.
+      </li>
+      <li>
+        Salva come testo UTF-8 <code>.json</code>, non <code>.json.txt</code>, con virgolette
+        doppie, senza commenti né virgole finali. Lascia <code>attachmentIds</code> a
+        <code>[]</code>: questo formato non importa audio.
+      </li>
+      <li>
+        Importa il file e conferma l’avviso sul JSON in chiaro. Nel diario trovi anche
+        <strong>Come importare i dati: formati e modello da compilare</strong>, con tutti i codici
+        ammessi e i campi facoltativi.
+      </li>
+    </ol>
+    <p>
+      CSV, Excel, Word e PDF non sono accettati. ID duplicati nello stesso file o campi non validi
+      fanno rifiutare il JSON. Il file compilato è in chiaro: conservalo privatamente.
+    </p>
+    <p class="guide-warning">
+      <strong>Ripristina backup</strong> non è un’aggiunta: sostituisce tutti gli episodi e gli
+      audio del diario aperto dopo conferma. Un JSON senza audio elimina gli audio già presenti.
+      Esporta prima un backup cifrato e verifica l’importazione prima di cancellare gli originali.
+      Nel cloud un errore di rete o storage può lasciare un’importazione parziale: controlla episodi
+      e audio dopo il trasferimento.
+    </p>
+  </section>
+
+  <section id="recupero" class="guide-section" aria-labelledby="recupero-title">
+    <h3 id="recupero-title">7. Password dimenticata e chiavi di recupero</h3>
+    <ul>
+      <li>
+        <strong>Account:</strong> dalla schermata di accesso scegli
+        <strong>Password dimenticata?</strong>, richiedi il codice via email e imposta una nuova
+        password. È il recupero del login, non dei backup esportati.
+      </li>
+      <li>
+        <strong>Profilo locale:</strong> scegli
+        <strong>Password dimenticata? Usa la chiave di recupero</strong>. Inserisci la chiave di
+        quel profilo, imposta la nuova password e conserva la nuova chiave generata. Senza password
+        e senza chiave il diario locale non è recuperabile.
+      </li>
+      <li>
+        <strong>Backup:</strong> serve sempre la password usata per esportare quella copia. Il reset
+        dell’account o del profilo non cambia la password dei backup precedenti e non li rende
+        recuperabili senza di essa.
+      </li>
+    </ul>
+  </section>
+
+  <section id="privacy" class="guide-section" aria-labelledby="privacy-title">
+    <h3 id="privacy-title">8. Privacy, installazione e limiti</h3>
+    <p>
+      Se il browser lo consente, puoi installare la PWA dal suo menu
+      <strong>Installa app</strong> o <strong>Aggiungi alla schermata Home</strong>. L’installazione
+      non crea un backup e non trasforma il profilo locale in un account.
+    </p>
+    <p>
+      Dal menu Account o Profilo puoi eliminare l’intero diario con conferma esplicita. Questa
+      operazione elimina gli episodi e gli audio dell’archivio selezionato, non i file scaricati, i
+      backup esportati o gli altri profili locali.
+    </p>
+    <ul>
+      <li>Non pubblicare episodi reali, registrazioni, chiavi o password nel repository.</li>
+      <li>
+        Raccogli solo dati necessari e separa fatti osservati, ipotesi e valutazioni professionali.
+      </li>
+      <li>L’app non genera PDF, lettere, fascicoli o allegati immagine.</li>
+      <li>
+        Non accerta responsabilità o conformità a limiti e non sostituisce consulenze legali,
+        tecniche o sanitarie.
+      </li>
+    </ul>
+  </section>
+
+  <section id="problemi" class="guide-section" aria-labelledby="problemi-title">
+    <h3 id="problemi-title">9. Se qualcosa non funziona</h3>
+    <dl>
+      <dt>Non vedo i miei episodi</dt>
+      <dd>
+        Controlla account o profilo attivo, browser e ricerca. Un diario locale non compare
+        automaticamente su un altro dispositivo o nell’account online.
+      </dd>
+      <dt>Il microfono non parte</dt>
+      <dd>
+        Controlla i permessi del sito, la disponibilità del microfono e il messaggio di errore. Usa
+        un browser aggiornato su HTTPS.
+      </dd>
+      <dt>Il file non viene importato</dt>
+      <dd>
+        Verifica estensione, limite di 120 MiB e password del backup. Per un JSON ricontrolla
+        sintassi, campi, codici e ID univoci usando il modello.
+      </dd>
+      <dt>Salvataggio o sincronizzazione non riusciti</dt>
+      <dd>
+        Leggi il messaggio nell’app. Per l’account verifica la connessione; per il diario locale
+        controlla che il browser consenta l’archiviazione. Non cancellare i dati del browser o gli
+        originali nel tentativo di risolvere il problema: conserva prima un backup se possibile.
+      </dd>
+    </dl>
+  </section>
+
+  <footer class="guide-footer">
+    <a routerLink="/">Torna all’app</a>
+    <a
+      href="https://github.com/federicocroletti-tech/noise-diary/blob/main/docs/guida-utente.md"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      Versione testuale nel repository
+    </a>
+  </footer>
+</main>

@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { RouterLink, RouterOutlet } from '@angular/router';
 import {
   afterNextRender,
   Component,
@@ -116,7 +117,7 @@ const EMPTY_DRAFT: NoiseEventDraft = {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink, RouterOutlet],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   host: {
@@ -130,6 +131,7 @@ export class App implements OnDestroy {
   private audioRequestId = 0;
 
   protected readonly title = signal('Diario Rumore');
+  protected readonly guideOpen = signal(false);
   protected readonly authMode = signal<AuthMode>('loading');
   protected readonly accountMode = signal<AccountMode>('loading');
   protected readonly accountUser = signal<AccountUser | null>(null);
@@ -262,6 +264,7 @@ export class App implements OnDestroy {
   protected readonly continuityOptions = CONTINUITY_TYPES;
   protected readonly statusOptions = EVENT_STATUSES;
   protected readonly perceivedEffectOptions: readonly PerceivedEffect[] = PERCEIVED_EFFECTS;
+  protected readonly openingStateOptions = ['Aperta', 'Socchiusa', 'Chiusa', 'Non so'];
   protected readonly choiceLabels: Record<string, string> = {
     HUM: 'Ronzio',
     VIBRATION: 'Vibrazione',
@@ -828,7 +831,7 @@ export class App implements OnDestroy {
       return;
     }
     if (!/\.(?:json|ndbackup)$/i.test(file.name)) {
-      this.storageError.set('Seleziona un file .ndbackup o un JSON storico.');
+      this.storageError.set('Seleziona un file .ndbackup o .json. Puoi usare il modello nella guida di importazione.');
       return;
     }
     if (file.size > MAX_BACKUP_FILE_SIZE) {
@@ -856,7 +859,7 @@ export class App implements OnDestroy {
       } else {
         if (
           !window.confirm(
-            'Questo JSON storico non è cifrato e non contiene registrazioni audio. Importarlo solo se proviene da una fonte attendibile?',
+            'Questo file JSON non è cifrato e non contiene registrazioni audio. Importarlo solo se proviene da una fonte attendibile?',
           )
         ) {
           this.importStatus.set('Importazione annullata; nessun episodio è stato modificato.');

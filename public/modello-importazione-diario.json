@@ -1,0 +1,22 @@
+{
+  "events": [
+    {
+      "id": "episodio-001",
+      "startedAt": "2026-11-12T22:30:00+01:00",
+      "createdAt": "2026-11-12T22:40:00+01:00",
+      "updatedAt": "2026-11-12T22:40:00+01:00",
+      "locationLabel": "Abitazione",
+      "room": "Camera",
+      "eventType": "HUM",
+      "continuityType": "intermittent",
+      "perceivedIntensity": 3,
+      "perceivedEffects": ["simple-observation"],
+      "suspectedSource": "Ventilazione (ipotesi)",
+      "description": "Esempio da sostituire: ronzio intermittente percepito in camera.",
+      "notes": "",
+      "status": "draft",
+      "tags": [],
+      "attachmentIds": []
+    }
+  ]
+}

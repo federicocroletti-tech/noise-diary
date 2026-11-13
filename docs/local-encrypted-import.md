@@ -15,11 +15,26 @@ Per trasferire esplicitamente il diario storico a un altro profilo, sblocca il p
 1. Sblocca il diario con la password locale.
 2. Scegli **Esporta backup cifrato**. Il file `.ndbackup` include gli episodi e le registrazioni audio e non rivela i relativi contenuti senza la password.
 3. Conserva il file in un luogo privato e sicuro. La copia non si aggiorna automaticamente.
-4. Sul browser di destinazione, crea o sblocca il diario locale. Scegli **Importa backup (aggiungi)**, seleziona il file e inserisci la password usata per esportarlo.
+4. Sul browser di destinazione, crea o sblocca il diario locale. Scegli **Backup → Importa file (aggiungi)**, seleziona il file e inserisci la password usata per esportarlo.
 5. L'importazione aggiuntiva conserva i dati già presenti. Gli episodi con lo stesso ID richiedono una scelta esplicita; le registrazioni già presenti non vengono sovrascritte né eliminate.
 6. Scegli **Ripristina backup** solo se vuoi sostituire tutti gli episodi e le registrazioni locali: l'app chiede conferma prima di procedere.
 
 Il limite attuale del file è 120 MiB. Nel diario locale il file viene letto, decifrato, validato e re-cifrato localmente; non viene caricato su GitHub Pages o su un server. Un file cifrato con password errata, contenuto non valido o audio che non supera il controllo SHA-256 viene rifiutato prima di applicare l'importazione.
+
+## Importare episodi preparati a mano
+
+Nel diario aperto, espandi **Come importare i dati: formati e modello da compilare** e scarica il modello JSON. Lo stesso [modello con dati fittizi](../public/modello-importazione-diario.json) è disponibile nel repository.
+
+1. Apri il file con un editor di testo, sostituisci i dati di esempio e conserva tutti i campi presenti.
+2. Per aggiungere episodi, duplica l'oggetto nell'elenco `events`, separa gli oggetti con una virgola e usa ID distinti.
+3. Usa date ISO con fuso orario, come `2026-11-12T22:30:00+01:00` (ora solare italiana), `+02:00` per l'ora legale o `Z` per UTC. L'intensità è un intero da 1 a 5 oppure `null`. La sorgente sospetta deve contenere la parola `ipotesi`.
+4. I codici ammessi per tipologia, andamento, stato ed effetti sono elencati nella guida nell'app: rispettane maiuscole e minuscole. I testi non compilati possono essere `""`; gli elenchi vuoti sono `[]`. Lascia `attachmentIds` vuoto: il modello non include audio.
+5. Salva il file come testo UTF-8 `.json`, non `.json.txt`. Non aggiungere commenti o virgole finali. CSV, Excel, Word e PDF non sono supportati.
+6. Scegli **Backup → Importa file (aggiungi)**, seleziona il JSON e conferma l'avviso sul file in chiaro. Verifica gli episodi importati.
+
+L'importazione accetta sia `{"events": [...]}` sia un elenco `[...]` non vuoto. ID duplicati nello stesso file o un episodio non valido fanno rifiutare il JSON. Con l'aggiunta, episodi identici già presenti sono saltati e versioni diverse dello stesso ID richiedono una scelta. **Ripristina backup** sostituisce invece episodi e audio del diario aperto: un JSON senza audio elimina gli audio esistenti dopo conferma. Esporta prima un backup cifrato.
+
+Il JSON compilato contiene dati in chiaro: non pubblicarlo e conservalo privatamente. Nell'account online, l'importazione trasferisce i dati ai servizi cloud dell'account attivo; nella modalità locale restano nel browser.
 
 ## Backup dell'account online
 
