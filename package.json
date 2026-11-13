@@ -5,6 +5,8 @@
     "ng": "ng",
     "start": "ng serve --host 0.0.0.0 --port 4200",
     "build": "ng build --configuration production --base-href ./",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android",
     "watch": "ng build --watch --configuration development --base-href ./",
     "test": "ng test --watch=false",
     "e2e": "playwright test",
@@ -14,6 +16,10 @@
   "private": true,
   "packageManager": "npm@10.9.8",
   "dependencies": {
+    "@capacitor/android": "8.6.2",
+    "@capacitor/core": "8.6.2",
+    "@capacitor/filesystem": "^8.0.0",
+    "@capacitor/share": "^8.0.0",
     "@angular/common": "^22.2.0",
     "@angular/compiler": "^22.2.0",
     "@angular/core": "^22.2.0",
@@ -27,6 +33,7 @@
     "tslib": "^2.3.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.6.2",
     "@angular/build": "^22.2.5",
     "@angular/cli": "^22.2.5",
     "@angular/compiler-cli": "^22.2.0",
