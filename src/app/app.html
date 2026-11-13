@@ -13,7 +13,16 @@
       <h1>{{ title() }}</h1>
     </div>
 
-    <div class="header-actions" *ngIf="diaryOpen() && !recoveryCode()">
+    <div class="header-actions">
+      <a
+        class="guide-link"
+        [routerLink]="recordingActive() ? null : guideOpen() ? '/' : '/guida'"
+        [attr.aria-disabled]="recordingActive() ? 'true' : null"
+        [attr.title]="recordingActive() ? 'Ferma e salva la registrazione prima di aprire la guida.' : null"
+      >
+        {{ guideOpen() ? 'Torna all’app' : 'Guida all’uso' }}
+      </a>
+      <ng-container *ngIf="diaryOpen() && !recoveryCode() && !guideOpen()">
       <button
         type="button"
         [class.primary]="!showForm()"
@@ -31,7 +40,7 @@
             Esporta backup cifrato
           </button>
           <button type="button" class="menu-item" [disabled]="authBusy()" (click)="importInput.click()">
-            Importa backup (aggiungi)
+            Importa file (aggiungi)
           </button>
           <button type="button" class="menu-item" [disabled]="authBusy()" (click)="replaceInput.click()">
             Ripristina backup
@@ -107,9 +116,16 @@
           </button>
         </div>
       </details>
+      </ng-container>
     </div>
   </header>
 
+  <router-outlet
+    (activate)="guideOpen.set(true)"
+    (deactivate)="guideOpen.set(false)"
+  ></router-outlet>
+
+  <div [hidden]="guideOpen()">
   <section class="panel auth-panel" *ngIf="accountMode() === 'loading'" role="status">
     Verifica della sessione account…
   </section>
@@ -547,6 +563,108 @@
     <section class="panel import-message" *ngIf="importStatus()" role="status">
       {{ importStatus() }}
     </section>
+    <details class="panel import-guide">
+      <summary>Come importare i dati: formati e modello da compilare</summary>
+      <h2>Prepara il file del diario</h2>
+      <p>
+        Hai già un backup <code>.ndbackup</code>? Importalo senza modificarlo: contiene episodi
+        e audio e richiede la password scelta all’esportazione, non quella dell’account.
+        Per inserire dati preparati a mano, usa invece il modello <code>.json</code> qui sotto.
+        CSV, Excel, Word e PDF non sono accettati. Limite per file: 120 MiB.
+      </p>
+      <p>
+        <a href="modello-importazione-diario.json" download="modello-importazione-diario.json">
+          Scarica il modello JSON con un episodio di esempio
+        </a>
+      </p>
+      <ol>
+        <li>Apri il modello con un editor di testo e sostituisci i dati di esempio con i tuoi.</li>
+        <li>
+          Conserva tutti i campi presenti. Per più episodi, duplica l’oggetto dentro
+          <code>events</code>, separando gli oggetti con una virgola e assegnando a ciascuno
+          un <code>id</code> diverso (per esempio <code>episodio-002</code>).
+        </li>
+        <li>
+          Salva come testo UTF-8 con estensione <code>.json</code>, non <code>.json.txt</code>.
+          Usa virgolette doppie, senza commenti né virgole dopo l’ultimo elemento.
+        </li>
+        <li>
+          Dal menu <strong>Backup → Importa file (aggiungi)</strong>, seleziona il file e
+          conferma l’avviso sul JSON non cifrato. Controlla poi gli episodi importati.
+        </li>
+      </ol>
+      <h3>Regole per compilare il JSON</h3>
+      <ul>
+        <li>
+          <code>startedAt</code> è l’inizio dell’episodio; <code>createdAt</code> e
+          <code>updatedAt</code> sono creazione e ultima modifica della scheda.
+          Usa date come <code>2026-11-12T22:30:00+01:00</code>, indicando il fuso
+          (<code>+02:00</code> per l’ora legale italiana; <code>Z</code> per UTC).
+        </li>
+        <li>
+          <code>locationLabel</code>, <code>room</code>, <code>description</code> e
+          <code>notes</code> sono testi liberi; puoi lasciare <code>""</code> se non compilati.
+          <code>suspectedSource</code> deve contenere la parola <strong>ipotesi</strong>,
+          per esempio <code>Non identificata (ipotesi)</code>.
+        </li>
+        <li>
+          <code>perceivedIntensity</code>: numero intero da 1 a 5, oppure <code>null</code>
+          se non indicata. Non usare virgolette per numeri o <code>null</code>.
+        </li>
+        <li>
+          <code>eventType</code>: <code>HUM</code> (ronzio), <code>VIBRATION</code> (vibrazione),
+          <code>IMPACT</code> (colpo), <code>DRAGGING</code> (trascinamento),
+          <code>MUSIC</code> (musica), <code>VOICES</code> (voci), <code>SYSTEM</code> (impianto),
+          <code>APPLIANCE</code> (elettrodomestico), <code>TRAFFIC</code> (traffico),
+          <code>UNKNOWN</code> (sconosciuto), <code>OTHER</code> (altro).
+        </li>
+        <li>
+          <code>continuityType</code>: <code>continuous</code> (continuo),
+          <code>intermittent</code> (intermittente), <code>impulsive</code> (impulsivo),
+          <code>periodic</code> (periodico), <code>variable</code> (variabile),
+          <code>unknown</code> (non noto).
+        </li>
+        <li>
+          <code>status</code>: <code>draft</code> (bozza), <code>complete</code> (completo),
+          <code>to-review</code> (da rivedere), <code>corrected</code> (corretto),
+          <code>exported</code> (esportato), <code>archived</code> (archiviato).
+        </li>
+        <li>
+          <code>perceivedEffects</code>: elenco di codici tra virgolette, oppure <code>[]</code>.
+          Codici ammessi: <code>awakening</code> (risveglio),
+          <code>difficulty-falling-asleep</code> (difficoltà ad addormentarsi),
+          <code>activity-interruption</code> (interruzione attività),
+          <code>vibration-perceived</code> (vibrazione percepita),
+          <code>concentration-difficulty</code> (difficoltà di concentrazione),
+          <code>simple-observation</code> (semplice osservazione), <code>other</code> (altro).
+        </li>
+        <li>
+          <code>tags</code>: elenco di etichette, per esempio <code>["sera", "camera"]</code>,
+          oppure <code>[]</code>. Lascia <code>attachmentIds</code> a <code>[]</code>:
+          il modello non importa registrazioni audio.
+        </li>
+        <li>
+          Campi facoltativi: <code>endedAt</code> (data di fine nello stesso formato),
+          <code>duration</code> (durata in secondi, maggiore di zero),
+          <code>witnessesCount</code> (numero intero di testimoni, da zero in su),
+          <code>microphonePosition</code>, <code>windowsState</code> e <code>doorsState</code>
+          (testi liberi). Se non servono, omettili.
+        </li>
+      </ul>
+      <p>
+        <strong>Aggiungi</strong> conserva gli episodi esistenti: quelli identici con lo stesso ID
+        vengono saltati; se i dati differiscono, scegli quale versione mantenere.
+        ID ripetuti nello stesso file o campi non validi causano il rifiuto del JSON.
+        <strong>Ripristina backup</strong>, invece, sostituisce tutti gli episodi e gli audio
+        del diario aperto dopo conferma: con un JSON senza audio, gli audio esistenti vengono eliminati.
+        Prima di un ripristino, esporta un backup cifrato.
+      </p>
+      <p class="privacy-note">
+        Il modello contiene solo dati fittizi. Una volta compilato, il JSON è in chiaro:
+        conservalo privatamente e non pubblicarlo. Nel diario locale i dati restano nel browser;
+        importando nell’account online vengono trasferiti al cloud dell’account attivo.
+      </p>
+    </details>
     <section
       class="panel import-review"
       *ngIf="pendingAppendImport() as pending"
@@ -601,233 +719,288 @@
         </div>
 
         <form class="event-form" (submit)="$event.preventDefault(); submitDraft()">
-          <label>
-            <span>Luogo</span>
-            <input
-              id="episode-location"
-              type="text"
-              [value]="draft().locationLabel"
-              (input)="onFieldChange('locationLabel', $any($event.target).value)"
-              placeholder="Es. Cucina, stanza notte"
-            />
-          </label>
+          <p class="form-required-note"><span aria-hidden="true">*</span> Campo obbligatorio</p>
 
-          <div class="two-columns">
-            <label>
-              <span>Data e ora di inizio</span>
-              <input
-                type="datetime-local"
-                required
-                [value]="draft().startedAt"
-                (input)="onFieldChange('startedAt', $any($event.target).value)"
-              />
-            </label>
-            <label>
-              <span>Durata (minuti, facoltativa)</span>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                [value]="draft().durationMinutes ?? ''"
-                (input)="
-                  onFieldChange(
-                    'durationMinutes',
-                    $any($event.target).value ? +$any($event.target).value : null
-                  )
-                "
-              />
-            </label>
-          </div>
-
-          <div class="two-columns">
-            <label>
-              <span>Stanza</span>
-              <input
-                type="text"
-                [value]="draft().room"
-                (input)="onFieldChange('room', $any($event.target).value)"
-              />
-            </label>
-
-            <label>
-              <span>Tipo evento</span>
-              <select
-                [value]="draft().eventType"
-                (change)="onFieldChange('eventType', $any($event.target).value)"
-              >
-                <option
-                  *ngFor="let option of eventTypeOptions"
-                  [value]="option"
-                  [selected]="option === draft().eventType"
-                >
-                  {{ labelFor(option) }}
-                </option>
-              </select>
-            </label>
-          </div>
-
-          <div class="two-columns">
-            <div>
+          <fieldset class="field-group">
+            <legend>Quando</legend>
+            <div class="two-columns">
               <label>
-                <span>Intensità percepita (1–5, soggettiva)</span>
+                <span>Data e ora di inizio <span class="required-marker" aria-hidden="true">*</span></span>
                 <input
-                  type="range"
+                  type="datetime-local"
+                  required
+                  [value]="draft().startedAt"
+                  (input)="onFieldChange('startedAt', $any($event.target).value)"
+                />
+              </label>
+              <label>
+                <span>Durata (minuti, facoltativa)</span>
+                <input
+                  type="number"
                   min="1"
-                  max="5"
                   step="1"
-                  [value]="draft().perceivedIntensity"
+                  [value]="draft().durationMinutes ?? ''"
                   (input)="
-                    intensityUnreported.set(false);
-                    onFieldChange('perceivedIntensity', +$any($event.target).value)
+                    onFieldChange(
+                      'durationMinutes',
+                      $any($event.target).value ? +$any($event.target).value : null
+                    )
                   "
                 />
-                <small *ngIf="intensityUnreported()"
-                  >Non indicata; aggiungi una valutazione solo se vuoi.</small
-                >
-                <small *ngIf="!intensityUnreported()"
-                  >{{ draft().perceivedIntensity }}/5 · valutazione personale</small
-                >
               </label>
-              <button
-                *ngIf="intensityUnreported()"
-                type="button"
-                class="secondary"
-                (click)="intensityUnreported.set(false)"
-              >
-                Indica un'intensità
-              </button>
             </div>
+          </fieldset>
 
-            <label>
-              <span>Andamento</span>
-              <select
-                [value]="draft().continuityType"
-                (change)="onFieldChange('continuityType', $any($event.target).value)"
-              >
-                <option
-                  *ngFor="let option of continuityOptions"
-                  [value]="option"
-                  [selected]="option === draft().continuityType"
-                >
-                  {{ labelFor(option) }}
-                </option>
-              </select>
-            </label>
-          </div>
-
-          <div class="two-columns">
-            <div *ngIf="effectsUnreported(); else effectsControl">
-              <span>Effetto percepito</span>
-              <p>Non indicato</p>
-              <button type="button" class="secondary" (click)="effectsUnreported.set(false)">
-                Seleziona un effetto
-              </button>
-            </div>
-            <ng-template #effectsControl>
+          <fieldset class="field-group">
+            <legend>Dove</legend>
+            <div class="two-columns">
               <label>
-                <span>Effetto percepito</span>
+                <span>Luogo</span>
+                <input
+                  id="episode-location"
+                  type="text"
+                  [value]="draft().locationLabel"
+                  (input)="onFieldChange('locationLabel', $any($event.target).value)"
+                  placeholder="Es. Cucina, pianerottolo, giardino"
+                  aria-describedby="episode-location-help"
+                />
+                <small id="episode-location-help" class="field-help">
+                  Dove hai percepito il rumore?
+                </small>
+              </label>
+              <label>
+                <span>Stanza (se applicabile)</span>
+                <input
+                  type="text"
+                  [value]="draft().room"
+                  (input)="onFieldChange('room', $any($event.target).value)"
+                  placeholder="Es. Camera da letto"
+                  aria-describedby="episode-room-help"
+                />
+                <small id="episode-room-help" class="field-help">
+                  La stanza in cui ti trovavi, se vuoi specificarla.
+                </small>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="field-group">
+            <legend>Cosa hai percepito</legend>
+            <div class="two-columns">
+              <label>
+                <span>Tipo di evento</span>
                 <select
-                  [value]="draft().perceivedEffects"
-                  (change)="onFieldChange('perceivedEffects', $any($event.target).value)"
+                  [value]="draft().eventType"
+                  (change)="onFieldChange('eventType', $any($event.target).value)"
                 >
                   <option
-                    *ngFor="let option of perceivedEffectOptions"
+                    *ngFor="let option of eventTypeOptions"
                     [value]="option"
-                    [selected]="option === draft().perceivedEffects"
+                    [selected]="option === draft().eventType"
                   >
                     {{ labelFor(option) }}
                   </option>
                 </select>
               </label>
-            </ng-template>
-            <label>
-              <span>Stato</span>
-              <select
-                [value]="draft().status"
-                (change)="onFieldChange('status', $any($event.target).value)"
-              >
-                <option
-                  *ngFor="let option of statusOptions"
-                  [value]="option"
-                  [selected]="option === draft().status"
+              <div>
+                <label>
+                  <span>Intensità percepita (1–5, soggettiva)</span>
+                  <input
+                    type="range"
+                    min="1"
+                    max="5"
+                    step="1"
+                    [value]="draft().perceivedIntensity"
+                    (input)="
+                      intensityUnreported.set(false);
+                      onFieldChange('perceivedIntensity', +$any($event.target).value)
+                    "
+                    aria-describedby="intensity-help"
+                  />
+                  <small id="intensity-help" class="field-help" *ngIf="intensityUnreported()">
+                    Non indicata; aggiungi una valutazione solo se vuoi.
+                  </small>
+                  <small id="intensity-help" class="field-help" *ngIf="!intensityUnreported()">
+                    {{ draft().perceivedIntensity }}/5 · valutazione personale
+                  </small>
+                </label>
+                <button
+                  *ngIf="intensityUnreported()"
+                  type="button"
+                  class="secondary"
+                  (click)="intensityUnreported.set(false)"
                 >
-                  {{ labelFor(option) }}
-                </option>
-              </select>
-            </label>
-          </div>
+                  Indica un'intensità
+                </button>
+              </div>
+            </div>
 
-          <label>
-            <span>Sorgente sospetta</span>
-            <input
-              type="text"
-              [value]="draft().suspectedSource"
-              (input)="onFieldChange('suspectedSource', $any($event.target).value)"
-            />
-          </label>
+            <div class="two-columns">
+              <label>
+                <span>Andamento</span>
+                <select
+                  [value]="draft().continuityType"
+                  (change)="onFieldChange('continuityType', $any($event.target).value)"
+                >
+                  <option
+                    *ngFor="let option of continuityOptions"
+                    [value]="option"
+                    [selected]="option === draft().continuityType"
+                  >
+                    {{ labelFor(option) }}
+                  </option>
+                </select>
+              </label>
+              <div *ngIf="effectsUnreported(); else effectsControl">
+                <span>Effetto percepito</span>
+                <p>Non indicato</p>
+                <button type="button" class="secondary" (click)="effectsUnreported.set(false)">
+                  Seleziona un effetto
+                </button>
+              </div>
+              <ng-template #effectsControl>
+                <label>
+                  <span>Effetto percepito</span>
+                  <select
+                    [value]="draft().perceivedEffects"
+                    (change)="onFieldChange('perceivedEffects', $any($event.target).value)"
+                  >
+                    <option
+                      *ngFor="let option of perceivedEffectOptions"
+                      [value]="option"
+                      [selected]="option === draft().perceivedEffects"
+                    >
+                      {{ labelFor(option) }}
+                    </option>
+                  </select>
+                </label>
+              </ng-template>
+            </div>
 
-          <label>
-            <span>Descrizione</span>
-            <textarea
-              rows="3"
-              [value]="draft().description"
-              (input)="onFieldChange('description', $any($event.target).value)"
-              placeholder="Descrivi la percezione soggettiva e il contesto."
-            ></textarea>
-          </label>
+            <div class="two-columns">
+              <label>
+                <span>Stato dell'episodio</span>
+                <select
+                  [value]="draft().status"
+                  (change)="onFieldChange('status', $any($event.target).value)"
+                >
+                  <option
+                    *ngFor="let option of statusOptions"
+                    [value]="option"
+                    [selected]="option === draft().status"
+                  >
+                    {{ labelFor(option) }}
+                  </option>
+                </select>
+              </label>
+            </div>
+          </fieldset>
 
-          <label>
-            <span>Note</span>
-            <textarea
-              rows="2"
-              [value]="draft().notes"
-              (input)="onFieldChange('notes', $any($event.target).value)"
-              placeholder="Eventi e osservazioni rilevanti."
-            ></textarea>
-          </label>
-
-          <label>
-            <span>Tag (separati da virgola)</span>
-            <input
-              type="text"
-              [value]="draft().tags"
-              (input)="onFieldChange('tags', $any($event.target).value)"
-            />
-          </label>
-
-          <div class="two-columns">
+          <fieldset class="field-group">
+            <legend>Contesto</legend>
             <label>
-              <span>Finestre</span>
+              <span>Sorgente sospetta (facoltativa)</span>
               <input
                 type="text"
-                [value]="draft().windowsState"
-                (input)="onFieldChange('windowsState', $any($event.target).value)"
+                [value]="draft().suspectedSource"
+                (input)="onFieldChange('suspectedSource', $any($event.target).value)"
+                placeholder="Solo se hai un'ipotesi"
               />
             </label>
 
+            <div class="two-columns">
+              <label>
+                <span>Finestra</span>
+                <select
+                  [value]="draft().windowsState"
+                  (change)="onFieldChange('windowsState', $any($event.target).value)"
+                >
+                  <option value="" [selected]="!draft().windowsState">Non indicata</option>
+                  <option
+                    *ngIf="draft().windowsState && !openingStateOptions.includes(draft().windowsState)"
+                    [value]="draft().windowsState"
+                    [selected]="true"
+                  >
+                    Valore salvato: {{ draft().windowsState }}
+                  </option>
+                  <option
+                    *ngFor="let option of openingStateOptions"
+                    [value]="option"
+                    [selected]="option === draft().windowsState"
+                  >
+                    {{ option }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                <span>Porta</span>
+                <select
+                  [value]="draft().doorsState"
+                  (change)="onFieldChange('doorsState', $any($event.target).value)"
+                >
+                  <option value="" [selected]="!draft().doorsState">Non indicata</option>
+                  <option
+                    *ngIf="draft().doorsState && !openingStateOptions.includes(draft().doorsState)"
+                    [value]="draft().doorsState"
+                    [selected]="true"
+                  >
+                    Valore salvato: {{ draft().doorsState }}
+                  </option>
+                  <option
+                    *ngFor="let option of openingStateOptions"
+                    [value]="option"
+                    [selected]="option === draft().doorsState"
+                  >
+                    {{ option }}
+                  </option>
+                </select>
+              </label>
+            </div>
+            <p class="field-help">Seleziona la condizione osservata durante l'episodio.</p>
+
             <label>
-              <span>Porta</span>
+              <span>Descrizione</span>
+              <textarea
+                rows="3"
+                [value]="draft().description"
+                (input)="onFieldChange('description', $any($event.target).value)"
+                placeholder="Descrivi la percezione soggettiva e il contesto."
+              ></textarea>
+            </label>
+
+            <label>
+              <span>Note</span>
+              <textarea
+                rows="2"
+                [value]="draft().notes"
+                (input)="onFieldChange('notes', $any($event.target).value)"
+                placeholder="Eventi e osservazioni rilevanti."
+              ></textarea>
+            </label>
+
+            <label>
+              <span>Tag (separati da virgola)</span>
               <input
                 type="text"
-                [value]="draft().doorsState"
-                (input)="onFieldChange('doorsState', $any($event.target).value)"
+                [value]="draft().tags"
+                (input)="onFieldChange('tags', $any($event.target).value)"
               />
             </label>
-          </div>
 
-          <label *ngIf="editingEventId()">
-            <span>Motivo della modifica (obbligatorio)</span>
-            <textarea
-              rows="2"
-              required
-              [value]="correctionReason()"
-              (input)="correctionReason.set($any($event.target).value)"
-              aria-describedby="correction-reason-help"
-            ></textarea>
-            <small id="correction-reason-help">
-              Il motivo e la versione precedente vengono conservati nella cronologia locale.
-            </small>
-          </label>
+            <label *ngIf="editingEventId()">
+              <span>Motivo della modifica <span class="required-marker" aria-hidden="true">*</span></span>
+              <textarea
+                rows="2"
+                required
+                [value]="correctionReason()"
+                (input)="correctionReason.set($any($event.target).value)"
+                aria-describedby="correction-reason-help"
+              ></textarea>
+              <small id="correction-reason-help" class="field-help">
+                Obbligatorio: motivo e versione precedente vengono conservati nella cronologia locale.
+              </small>
+            </label>
+          </fieldset>
 
           <div class="audio-file-actions">
             <button type="submit" class="primary submit">
@@ -1124,6 +1297,7 @@
       </aside>
     </div>
   </main>
+  </div>
 
   <footer class="disclaimer">
     <strong>Disclaimer:</strong> le misurazioni sono indicative, non calibrate, dipendenti dal

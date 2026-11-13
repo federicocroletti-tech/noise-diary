@@ -2,6 +2,12 @@
 
 Diario Rumore è una PWA per annotare episodi di rumore domestico e ambientale. Supporta account online email/password con sincronizzazione privata e mantiene separato il diario locale storico.
 
+## Come usare l’app
+
+Leggi la **[Guida all’uso di Diario Rumore](./docs/guida-utente.md)**: primo accesso, account e profili locali, creazione e correzione degli episodi, audio, backup, importazione e recupero password.
+
+La stessa guida è disponibile nell’app dal collegamento **Guida all’uso** nell’intestazione, anche prima dell’accesso.
+
 ## Cosa offre oggi
 
 - Diario cronologico con ricerca, ordinamento e bozze.
