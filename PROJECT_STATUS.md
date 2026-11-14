@@ -1,152 +1,153 @@
 # Stato del progetto
 
-## 1. Identificazione
+Aggiornato il **2026-11-14** mediante lettura del working tree. Questo e'
+il contesto sintetico corrente per i prossimi prompt; prevale sulle fotografie
+storiche del 1, 8 e 10 novembre. Non certifica la versione online.
 
-- **Nome:** Diario Rumore (`noise-diary`).
-- **Scopo dichiarato:** annotare episodi di rumore domestico e ambientale e organizzare guide documentali.
-- **Utenti previsti:** uso privato dichiarato nel brief; la destinazione definitiva non è stata confermata.
-- **Repository:** [federicocroletti-tech/noise-diary](https://github.com/federicocroletti-tech/noise-diary).
-- **Branch locale:** `main` (allineato a `origin/main` prima delle modifiche locali non committate).
-- **Deployment:** GitHub Pages, [noise-diary](https://federicocroletti-tech.github.io/noise-diary/); raggiungibilità verificata via HTTPS.
-- **Tecnologie:** Angular 22, TypeScript 6, RxJS 7, SCSS, Vitest, IndexedDB, Web Crypto e Angular Service Worker.
-- **Evidenze:** [README.md](./README.md), [package.json](./package.json), [angular.json](./angular.json), [docs/INITIAL_PROJECT_BRIEF.md](./docs/INITIAL_PROJECT_BRIEF.md).
+## Repository e perimetro verificato
 
-## 2. Stato verificato
+- Repository: [federicocroletti-tech/noise-diary](https://github.com/federicocroletti-tech/noise-diary).
+- Branch rilevato: `feat/android-apk`; HEAD iniziale `9b24436`.
+- Frontend configurato su [GitHub Pages](https://federicocroletti-tech.github.io/noise-diary/).
+- Backend effettivo nel codice: **Neon**, non Supabase. Account e cloud sono
+  implementati; la vecchia conversazione che li descriveva come assenti e'
+  superata.
+- Analisi statica di codice, template, stili, manifest, SQL, workflow e documenti.
+  Nessun accesso account, verifica live, deploy, audit vulnerabilita', build o
+  test applicativo eseguito in questo aggiornamento solo documentale.
+- Non e' stato verificato il piano commerciale/gratuito attuale dei provider,
+  ne' quale commit sia attualmente pubblicato.
 
-- **Data e ora dell’analisi:** 2026-11-08, circa 23:20 CET.
-- **Commit remoto/local base:** `7ba2aa9` (merge del PR #3 su `main`); le modifiche della funzione di cancellazione sono locali e non committate.
-- **Ambiente:** Windows; Node.js `v22.22.3`; npm `10.9.8`; dipendenze già presenti in `node_modules`.
-- **Comandi eseguiti:**
-  - `git status --short --branch`, `git branch -vv`, `git log`, confronto locale `HEAD...origin/main` (nessun `fetch`);
-  - `npm test` — superato, 6 file e 36 test;
-  - `npm run build` — superato, con warning sul budget SCSS;
-  - `npm run content:check` — superato, con avviso di revisore non assegnato;
-  - `npm run lint` — fallito, Prettier segnala 65 file;
-  - `git diff --check` — superato;
-  - prova browser locale — backup cifrato di un episodio e un audio sintetici ripristinato su un'origine pulita; cancellazione verificata su entrambi gli archivi di prova (IndexedDB assente, chiave/vault e dati legacy assenti).
-- **Modifiche locali:** funzione esplicita di cancellazione, test e documentazione; non ancora committate né pubblicate.
-- Nessuna dipendenza è stata installata. Il deploy Pages più recente è il merge `7ba2aa9`; il codice locale di cancellazione non è ancora incluso nel sito live.
-- **Evidenze:** verifiche locali del 2026-11-08; workflow configurato in [.github/workflows/deploy-pages.yml](./.github/workflows/deploy-pages.yml).
+## Funzionalita'
 
-## 3. Funzionalità presenti
+| Area          | Stato nel codice                                                                                                                                                                                                         |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Account       | Neon Auth: registrazione email/password, verifica email OTP, accesso, recupero password OTP, sessione e logout.                                                                                                          |
+| Diario        | Creazione, bozze, elenco, dettaglio, ricerca testuale, ordinamento data/intensita'/stanza, modifica motivata con snapshot e cancellazione.                                                                               |
+| Dati evento   | Luogo, stanza, data/ora, tipo/andamento, intensita' soggettiva 1-5, effetti, ipotesi, note, tag, stato e contesto ambientale. Non sono misure fonometriche.                                                              |
+| Locale        | Profili separati nello stesso browser, vault/password/chiave di recupero per profilo, recupero e rotazione chiave, IndexedDB cifrata.                                                                                    |
+| Cloud         | Eventi e metadati in PostgreSQL via Data API; audio in Object Storage privato tramite Function e URL firmati. Policy RLS definite per utente.                                                                            |
+| Audio         | Registrazione esplicita, pausa/ripresa se supportate, massimo 300 secondi/50 MiB, SHA-256, player, download e cancellazione.                                                                                             |
+| Backup        | `.ndbackup` cifrato con eventi/audio, limite UI 120 MiB; import additivo con conflitti o sostitutivo confermato; JSON storico importabile con avviso. Export account con passphrase autonoma, locale con password vault. |
+| Trasferimento | Locale e cloud distinti: passaggio tramite backup/import esplicito, non migrazione automatica.                                                                                                                           |
+| Eliminazione  | Diario locale o diario account secondo la modalita'; non elimina copie esportate e non equivale a secure erase o necessariamente alla cancellazione dell'identita' Auth.                                                 |
+| Guida         | Guida integrata raggiungibile anche prima del login e documento utente; modello JSON importabile.                                                                                                                        |
+| Android       | Capacitor configurato; progetto Android e servizio file nativo presenti nel working tree, parte del lavoro ancora non versionata. Non attestata disponibilita' di APK funzionante/release.                               |
 
-| Funzionalità                         | Stato ed evidenza                                                                                                                                                                                                                    | Verifica                                                                                                                                                      |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Creazione di una bozza evento        | Presente: il form raccoglie data/ora, stanza, intensità percepita e contesto. La stanza non è obbligatoria.                                                                                                                          | Test componente incluso in `npm test`.                                                                                                                        |
-| Consultazione, ricerca e ordinamento | Presente: lista con ricerca testuale e ordinamento per data, intensità o stanza; non è una tabella.                                                                                                                                  | Ispezione di [src/app/app.html](./src/app/app.html) e [src/app/app.ts](./src/app/app.ts).                                                                     |
-| Modifica evento                      | Presente: richiede un motivo, salva uno snapshot precedente e mantiene la cronologia nell'evento locale cifrato.                                                                                                                     | Test componente per salvataggio, annullamento e conservazione dei valori non indicati; `npm test` superato.                                                   |
-| Eliminazione evento                  | Presente: richiede conferma e rimuove evento e clip audio associate dalla IndexedDB locale con una transazione. Non attesta cancellazione da backup o altri dispositivi.                                                             | Test di componente e storage inclusi in `npm test`.                                                                                                           |
-| Intensità                            | Scala numerica discreta 1–5, esplicitamente soggettiva; non è una misura in dB(A).                                                                                                                                                   | Template e modello in [src/app/domain/noise-event.model.ts](./src/app/domain/noise-event.model.ts).                                                           |
-| Persistenza locale                   | Eventi e audio cifrati con AES-GCM in IndexedDB; chiave dati avvolta da password e chiave di recupero locale. Vault precedenti migrano al primo sblocco con la password corrente.                                                    | Test servizio e browser locale; cancellazione dell'archivio verificata con dati sintetici.                                                                    |
-| Recupero password                    | La chiave di recupero consente di impostare una nuova password e viene sostituita; la chiave nuova va conservata e confermata. Non esiste un reset remoto o admin.                                                                   | Test di servizio/UI inclusi nei 36 test superati.                                                                                                             |
-| Backup e ripristino                  | File `.ndbackup` cifrato con password inserita all'esportazione, episodi e audio; importazione additiva con gestione esplicita dei conflitti e modalità sostitutiva confermata. JSON storici in chiaro importabili solo dopo avviso. | Round-trip browser locale con un episodio e una registrazione sintetici; entrambi visibili dopo il ripristino.                                                |
-| Cancellazione locale                 | Rimuove database IndexedDB, dati legacy e configurazione del vault dall'origine corrente dopo conferma digitata. Non elimina file/backup esportati né effettua secure erase.                                                         | Test di servizio/UI e verifica browser locale su archivi sintetici.                                                                                           |
-| Registrazione audio                  | Avvio esplicito, accesso al microfono, limite temporale e dimensionale, conservazione locale cifrata.                                                                                                                                | Ispezione di [audio-recording.service.ts](./src/app/audio/audio-recording.service.ts) e [audio-clip.repository.ts](./src/app/audio/audio-clip.repository.ts). |
-| Guide documentali                    | Contenuti editoriali organizzativi; non sono funzioni generate dall’app e non costituiscono consulenza.                                                                                                                              | [situations/noise/README.md](./situations/noise/README.md).                                                                                                   |
+Fonti: [App](./src/app/app.ts), [template](./src/app/app.html),
+[servizi](./src/app/services), [audio](./src/app/audio),
+[modello](./src/app/domain/noise-event.model.ts).
 
-## 4. Funzionalità parziali o mancanti
+## Codice e architettura
 
-- La consultazione è una lista, non la tabella richiesta.
-- La stanza è facoltativa; l’intensità ha un valore iniziale e i valori non hanno descrittori accessibili individuali.
-- L’ora locale viene convertita in UTC senza conservare il fuso orario originale.
-- Non risultano implementati planimetria, calendario, report o sincronizzazione. La cancellazione degli archivi gestiti dall'app e il ripristino cifrato sono stati verificati con dati sintetici su origini browser locali separate; questa verifica non dimostra cancellazione sicura dei supporti o rimozione di copie esportate/sincronizzate.
-- Il pannello “Analisi frequenze” dichiara che l’analisi non è disponibile; l’indicatore “Offline” è statico.
-- La cancellazione riguarda gli archivi gestiti dall'app nell'origine corrente; altre origini, profili, backup e copie sincronizzate restano fuori ambito.
+- Angular 22 standalone, TypeScript 6, RxJS 7, signals, SCSS custom, Web Crypto,
+  IndexedDB e Angular Service Worker; Capacitor 8 per il contenitore Android.
+- Il componente principale concentra ancora autenticazione, form, stato UI,
+  import/export e orchestrazione locale/cloud. Servizi separati per Auth,
+  database, audio, vault, profili e backup: evolvere senza ricreare queste funzioni.
+- La guida usa il router e un `router-outlet`; non descrivere piu' il routing
+  come completamente vuoto.
+- SQL in [001_user_diaries.sql](./database/migrations/001_user_diaries.sql):
+  tabelle `diary_events` e `diary_audio_clips`, payload JSONB, chiavi composte
+  `(user_id, id)`, FK audio-evento e RLS con `auth.user_id()`.
+- La [Function audio](./functions/diary-audio/index.ts) media l'accesso allo
+  storage. SQL e sorgenti non provano che configurazione e policy remote siano
+  attualmente distribuite e corrette.
+- Architettura dettagliata: [CURRENT_ARCHITECTURE.md](./docs/CURRENT_ARCHITECTURE.md).
 
-## 5. Build, lint e test
+## Grafica, UX e impostazioni
 
-| Comando                 | Esito                      | Problemi o note                                                                                                                       |
-| ----------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm test`              | Superato — 6 file, 36 test | Include test CRUD, backup cifrato, cancellazione e rimozione degli audio associati.                                                   |
-| `npm run build`         | Superato                   | `src/app/app.scss` è 7,83 kB: supera il warning budget di 4 kB, ma resta sotto il limite di errore di 8 kB.                           |
-| `npm run lint`          | Fallito                    | Prettier segnala 65 file; il comando controlla Markdown/YAML/tool, non il TypeScript. Nessun file è stato formattato automaticamente. |
-| `npm run content:check` | Superato                   | È segnalato il revisore non assegnato in `situations/noise/metadata.yml`; nessun indice è stato rigenerato.                           |
-| `git diff --check`      | Superato                   | Nessun errore whitespace.                                                                                                             |
+- Tema scuro custom blu/notte, accenti ciano/verde acqua, pannelli e controlli
+  arrotondati; font di sistema. Nessuna libreria componenti UI nel manifest.
+- Header con identita' account/profilo, guida, azione episodio e menu Backup e
+  Account/Profilo; riepilogo con quattro indicatori, modulo raggruppato,
+  elenco/dettaglio e stati vuoti/ricerca senza risultati.
+- Layout responsive con breakpoint 980 e 640 px, griglie adattive, focus
+  visibile e supporto `prefers-reduced-motion`.
+- Presenza di test di layout non equivale a certificazione WCAG, verifica con
+  screen reader o collaudo Android reale. Nessuna nuova verifica visuale svolta.
+- Impostazioni operative: account o locale, scelta profilo, lock, recupero e
+  rotazione chiave, ordinamento/ricerca, backup/import e cancellazione.
+  Non risulta un pannello generale impostazioni, editor account/ruoli,
+  selettore tema/lingua o timeout di inattivita'.
+- Restano testi da rifinire, ad esempio `Torna all?account` nel template.
 
-Non esiste uno script `typecheck` separato; la compilazione Angular è inclusa nei test e nella build. La prova browser usa solo dati sintetici e origini localhost distinte; non sono stati eseguiti test mobile o verifiche automatiche di accessibilità.
+Fonti: [stili globali](./src/styles.scss), [stili App](./src/app/app.scss),
+[template](./src/app/app.html), [guida](./docs/guida-utente.md).
 
-## 6. Git e GitHub
+## Configurazione e pubblicazione
 
-- **Branch:** `main`, allineato a `origin/main` al commit `7ba2aa9` prima delle modifiche locali di questa attività.
-- **Remote:** `origin` configurato per `federicocroletti-tech/noise-diary`.
-- **Worktree:** modifiche locali non committate per la funzione di cancellazione, test e documentazione.
-- **Modifiche del worktree:** interfaccia e servizi per cancellazione locale, test, README, privacy, roadmap e questo riepilogo di stato. Tutto non committato.
-- `.gitignore` esclude dipendenze, build e cache, ma non contiene una regola esplicita per `.env`. Nessun file `.env` è stato rilevato per nome nel progetto; non sono stati letti valori di configurazione né eseguita una scansione completa di segreti.
-- La documentazione preesistente segnala un possibile dato residenziale pubblicato in fixture e cronologia. Non è stato riprodotto né verificato in questa analisi.
-- Nessun commit, push o deployment delle modifiche locali è stato eseguito.
+- Endpoint pubblici Neon Auth/Data API/Function definiti in
+  [neon-config.ts](./src/app/services/neon-config.ts); non aggiungere credenziali
+  amministrative al frontend.
+- [capacitor.config.ts](./capacitor.config.ts): app ID
+  `tech.federicocroletti.noisediary`, bundle web in
+  `dist/noise-diary-app/browser`, origine HTTPS con hostname
+  `federicocroletti-tech.github.io`. Cambiarla richiede verificare CORS/Auth.
+- Android richiede SDK/JDK e verifica separata: consultare
+  [README](./README.md); la guida Android locale non era ancora tracciata
+  all'inizio dell'analisi. Account cloud senza coda scritture offline.
+- Service worker production per bundle/assets, non backup del diario.
+- Workflow PR: contenuti, formattazione, unit test, Playwright Chromium e build.
+  Deploy Pages su push `main` o avvio manuale: unit test, E2E, build e publish.
+  Nessun job Android o distribuzione backend nei due workflow esaminati.
+- SMTP dedicato indicato come necessario dalla documentazione per uso pubblico;
+  configurazione effettiva non ricontrollata.
 
-## 7. Deployment
+## Verifiche e comandi di riferimento
 
-- **Provider configurato:** GitHub Pages tramite [deploy-pages.yml](./.github/workflows/deploy-pages.yml); nessun `render.yaml` o Dockerfile rilevato.
-- Il workflow Actions mostra un deploy riuscito per il merge `7ba2aa9`: [run 42526189349](https://github.com/federicocroletti-tech/noise-diary/actions/runs/42526189349).
-- Il sito risponde via HTTPS, ma non include le modifiche locali non committate della cancellazione.
+Comandi definiti in [package.json](./package.json):
+`npm test`, `npm run e2e`, `npm run build`, `npm run lint`,
+`npm run content:check`, `npm run android:sync`, `npm run android:apk`.
+Non rieseguiti per questa revisione documentale: non riusare i vecchi conteggi
+test/esiti come se descrivessero il branch corrente.
 
-## 8. Architettura
+- Vitest/fake-indexeddb per servizi e componente.
+- Playwright in [e2e](./e2e), progetti desktop Chrome e Pixel 7, lingua italiana,
+  fuso Europe/Rome, server locale porta 4317; copertura diario locale,
+  intestazione/guida, modulo, ricerca e layout. Non dimostra isolamento reale
+  fra due account remoti o funzionamento della WebView Android.
+- `lint` controlla Markdown/YAML/tools con Prettier, non e' un lint TypeScript.
+- Build Angular production: budget iniziale warning 500 kB/errore 1 MB;
+  stile componente warning 4 kB/errore 8 kB.
 
-Applicazione Angular standalone a singola vista, con stato locale basato su signals nel componente principale. `app.routes.ts` esporta un array di route vuoto. La persistenza è browser-local; non è stato individuato un backend applicativo. Il Service Worker memorizza bundle e asset statici.
+## Regole e limiti da preservare
 
-Evidenze: [docs/CURRENT_ARCHITECTURE.md](./docs/CURRENT_ARCHITECTURE.md), [src/app/app.ts](./src/app/app.ts), [src/app/app.routes.ts](./src/app/app.routes.ts), [ngsw-config.json](./ngsw-config.json).
+- **Cloud non E2EE:** Neon conserva contenuti accessibili lato servizio; RLS
+  separa gli account. AES-GCM/PBKDF2 protegge il vault locale e i backup, non
+  trasforma automaticamente i dati cloud in cifrati end-to-end.
+- Non inviare password/chiavi private al repository, non committare backup o
+  dati reali. [.gitignore](./.gitignore) esclude `.env`, backup e `.ndbackup`.
+- Conservare compatibilita' dei backup, dati preesistenti e separazione profili.
+  Operazioni distruttive e import sostitutivi richiedono conferma.
+- Audio/hash non dimostrano sorgente, responsabilita', autenticita' o conformita'
+  normativa; osservazioni, ipotesi e misurazioni vanno tenute distinte.
+- Governance: PR, Code Owners, controllo contenuti/fonti e revisione pertinente;
+  protezioni GitHub richieste nei documenti ma non verificate dal checkout.
+- Codice MIT, contenuti/documentazione CC BY 4.0. Nessuna riscrittura della
+  cronologia o bonifica storica senza autorizzazione separata.
 
-## 9. Dati e persistenza
+Riferimenti: [GOVERNANCE](./GOVERNANCE.md), [CONTRIBUTING](./CONTRIBUTING.md),
+[PRIVACY](./PRIVACY.md), [SECURITY](./SECURITY.md),
+[regole editoriali](./docs/content-review-policy.md).
 
-Gli eventi e i contenuti audio sono cifrati prima della scrittura in IndexedDB. La configurazione del vault locale è in localStorage; una chiave dati casuale è avvolta da chiavi derivate da password e chiave di recupero, che non vengono salvate in chiaro. La chiave di recupero consente il reset locale della password. I vault precedenti migrano al primo sblocco valido e la nuova chiave viene attivata solo dopo che l'utente ne conferma il salvataggio. Il backup `.ndbackup` è cifrato separatamente con la password fornita all'esportazione; il round-trip di episodio e audio è stato provato con dati sintetici. La nuova cancellazione rimuove il database IndexedDB, i dati legacy e la configurazione del vault dall'origine corrente; non rimuove backup esportati né promette cancellazione sicura dei supporti.
+## Lacune e prossime verifiche, non nuove implementazioni
 
-## 10. Sicurezza e privacy
+1. Completare e collaudare il lavoro Android esistente: import/export/condivisione,
+   microfono, sessione, rete e build APK su dispositivo reale.
+2. Verificare due account remoti, RLS/storage, errori parziali DB/blob e concorrenza
+   durante scritture/import; non presumere atomicita' cloud.
+3. Confermare versione Pages, configurazioni remote, SMTP e limiti/costi provider.
+4. Mancano pipeline acustica reale (pannello frequenze placeholder), planimetria,
+   PDF/fascicoli, immagini/video, ruoli amministrativi applicativi e conservazione
+   esplicita del fuso originale.
+5. Accessibilita' completa, retention e lock automatico restano da definire/verificare.
 
-- I dati potenzialmente trattati localmente includono data/ora, stanza, descrizioni, note, intensità ed eventuali audio identificabili.
-- Nel codice esaminato non sono stati individuati account, backend applicativo, cookie o analytics. La verifica è limitata al sorgente letto e non certifica l’assenza di ogni possibile comunicazione.
-- La cifratura locale non protegge da codice malevolo eseguito nella pagina mentre il vault è sbloccato; il lock è manuale.
-- I backup cifrati sono copie indipendenti e non si aggiornano; resta necessaria una conservazione sicura della password del backup e del file. La chiave di recupero è un segreto distinto che consente di impostare una nuova password per il vault.
-- La cancellazione degli archivi gestiti dall'app è verificata con dati sintetici, ma non equivale a secure erase e non elimina copie esterne.
-- La documentazione segnala un possibile dato personale nelle fixture/cronologia già pubblica; l’analisi non ha ripetuto una scansione storica.
-- Nessuna valutazione di conformità GDPR, valutazione legale o revisione crittografica è stata svolta.
+## Stato Git da non confondere con una release
 
-Riferimenti: [PRIVACY.md](./PRIVACY.md), [SECURITY.md](./SECURITY.md), [docs/DATA_CLASSIFICATION.md](./docs/DATA_CLASSIFICATION.md), [docs/SECURITY_THREAT_MODEL.md](./docs/SECURITY_THREAT_MODEL.md).
-
-## 11. Accessibilità
-
-Sono presenti label per vari controlli e alcuni messaggi con ruoli ARIA. Gli elementi selezionabili della lista supportano click, Invio e Spazio; i pulsanti di modifica ed eliminazione hanno etichette accessibili. La UI ha media query responsive, ma non è stata verificata su dispositivi. Nessun test WCAG 2.2, axe o screen reader è stato eseguito; contrasto e target non sono stati misurati.
-
-## 12. Debito tecnico
-
-- La vista è una lista anziché una tabella; il CRUD è verificato tramite test unitari ma non ancora tramite test E2E/browser.
-- Nessuna conservazione esplicita del fuso orario.
-- Definire retention e lock automatico; testare errori di password/file backup e condizioni multi-scheda.
-- Pipeline locale non verde per formattazione e indice editoriale.
-- Assenza di test E2E e accessibilità automatizzata.
-- Warning di budget sul foglio SCSS.
-- Alcuni indicatori/analisi della UI sono statici o non implementati.
-
-## 13. Rischi e blocchi
-
-- **P0 — privacy:** rischio storico dichiarato nei documenti, da valutare senza riscrivere la cronologia senza autorizzazione esplicita.
-- **P1 — funzionalità:** la consultazione resta una lista anziché una tabella; modifica ed eliminazione locale sono implementate e verificate, ma non garantiscono la cancellazione da backup o altri dispositivi.
-- **P1 — continuità dati:** perdita della chiave di recupero e della password, o dello storage senza backup valido, può impedire il recupero; il round-trip locale è stato provato con dati sintetici.
-- **P2 — accessibilità:** navigazione della lista da tastiera e conformità WCAG non verificate.
-- **P2 — qualità:** lint fallisce localmente per formattazione; content check passa con avviso di revisore mancante.
-- **Non verificabile:** configurazioni amministrative GitHub e cancellazione da backup del browser/sincronizzazioni esterne.
-
-## 14. Decisioni da prendere
-
-- Confermare se l’app resterà esclusivamente personale o verrà distribuita ad altri.
-- Definire retention e timeout del vault; l'eliminazione locale non equivale a secure erase.
-- Decidere quale fuso orario conservare e come trattare cambi di ora legale.
-- Valutare il rischio storico privacy con una procedura separata e autorizzata.
-- Confermare requisiti e limiti per una futura planimetria, che contiene dati domestici potenzialmente sensibili.
-- Assegnare un revisore qualificato per i contenuti normativi; i documenti attuali non costituiscono verifica legale.
-
-## 15. Roadmap proposta
-
-| Priorità | Attività e motivazione                                                          | Dipendenze                                                          | Rischio | Complessità | Criterio di accettazione                                                                            | Test richiesti                                                                              |
-| -------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------- | ----------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| P0       | Valutare il rischio di dati personali nella cronologia pubblica.                | Decisione del proprietario; nessuna riscrittura senza approvazione. | Alto    | M           | Decisione e perimetro documentati senza esporre i dati.                                             | Verifica autorizzata di repository/cronologia, senza riportare valori sensibili.            |
-| P1       | Verifica di regressione post-pubblicazione per restore e cancellazione locale.  | Revisione e pubblicazione delle modifiche locali.                   | Alto    | M           | Episodi e audio ripristinati; archivio vuoto dopo cancellazione; limiti dichiarati chiaramente.     | Round-trip sintetico, cancellazione, password errata e file corrotti.                       |
-| P2       | Risolvere formattazione e indice editoriale in attività indipendenti.           | Revisione dei contenuti e assegnazione revisore.                    | Basso   | S           | `npm run lint` e `npm run content:check` superati senza disabilitare controlli.                     | Eseguire i due comandi in sola verifica.                                                    |
-| P2       | Migliorare navigazione da tastiera e verifiche responsive/accessibilità.        | Nessuna.                                                            | Medio   | M           | Flussi principali usabili da tastiera con focus evidente.                                           | Test manuale, screen reader e axe su flussi essenziali.                                     |
-| P3       | Valutare planimetria locale con overlay immagine/SVG e coordinate normalizzate. | Planimetria fornita e decisione privacy esplicita.                  | Alto    | L           | Nessun upload o tile esterno; posizione persistente in locale e indipendente dal ridimensionamento. | Test di resize, zoom, associazione alla stanza, persistenza e assenza di richieste esterne. |
-
-Per la planimetria, un overlay locale su immagine/SVG con coordinate normalizzate `[0,1]` è una prima opzione proporzionata; aree delle stanze possono essere aggiunte successivamente. Leaflet `CRS.Simple` può offrire zoom e pan ma introduce dipendenza e complessità. Un PDF andrebbe elaborato localmente; planimetria e coordinate non dovrebbero essere caricate su servizi esterni o pubblicate senza autorizzazione.
-
-## 16. Prossimo passo consigliato
-
-Rivedere le modifiche locali della cancellazione prima di un eventuale commit/PR; non eseguire commit, push o deployment senza autorizzazione esplicita.
+All'inizio: nessuna modifica staged; modificati README, guida utente, guida import,
+manifest, App e componente guida; non tracciati progetto Android, guida Android,
+servizio file nativo e relativo test. Questo intervento committa soltanto i
+documenti di contesto esplicitamente selezionati, non quel lavoro applicativo.
+Ricontrollare `git status` prima di ogni prossimo intervento; nessun push o deploy
+e' incluso in questa attivita'.

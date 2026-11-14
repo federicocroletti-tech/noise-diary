@@ -1,5 +1,11 @@
 # Roadmap
 
+> Contesto corrente (2026-11-14): [stato del progetto](./PROJECT_STATUS.md)
+> e [handoff](./docs/SESSION_HANDOFF.md). Le fasi e il prossimo passo sotto
+> sono storici: account Neon, profili, guida e test E2E esistono gia';
+> Android Capacitor e' in lavorazione. Non interpretarli come funzionalita'
+> ancora tutte da implementare.
+
 > Aggiornamento NOYSE, 2026-11-10: il piano applicativo corrente, con inventario verificato, gap e backlog, e' in [NOYSE: analisi e piano di evoluzione](./docs/NOYSE_EVOLUTION.md). La sequenza e il prossimo passo qui sotto sono storici e precedono l'integrazione cloud presente nel working tree.
 
 Le fasi sono sequenziali e soggette a revisione. Non implicano date o funzionalità già disponibili.
