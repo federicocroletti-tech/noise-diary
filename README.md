@@ -4,7 +4,9 @@ Diario Rumore è una PWA per annotare episodi di rumore domestico e ambientale. 
 
 ## App Android
 
-È disponibile un’app Android nativa con la stessa interfaccia e lo stesso account/database cloud. Richiede Internet per leggere e sincronizzare l’account; le modifiche offline non vengono accodate. Consulta [la guida Android](./docs/android-app.md) per prerequisiti, generazione e percorso dell’APK di debug.
+È disponibile un’app Android nativa con la stessa interfaccia e lo stesso account/database cloud. Richiede Internet per leggere e sincronizzare l’account; le modifiche offline non vengono accodate.
+
+**[Scarica l’ultima versione dell’APK](https://github.com/federicocroletti-tech/noise-diary/releases/latest/download/diario-rumore.apk)**, anche direttamente dal telefono. La [guida Android](./docs/android-app.md) spiega installazione, aggiornamenti, firma e compilazione locale.
 
 ## Come usare l’app
 
