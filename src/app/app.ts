@@ -33,6 +33,7 @@ import { LocalDiaryProfile, LocalProfileService } from './services/local-profile
 import { AccountUser, NeonAuthService } from './services/neon-auth.service';
 import { NeonAudioRepository } from './services/neon-audio.repository';
 import { NeonDiaryService } from './services/neon-diary.service';
+import { NativeFileService } from './services/native-file.service';
 
 type SortMode = 'recent' | 'intensity' | 'room';
 type DiaryView = 'list' | 'form' | 'detail';
@@ -308,6 +309,7 @@ export class App implements OnDestroy {
     private readonly accountService: NeonAuthService,
     private readonly neonDiary: NeonDiaryService,
     private readonly neonAudioRepository: NeonAudioRepository,
+    private readonly nativeFileService: NativeFileService,
   ) {
     void this.initialize();
   }
@@ -1432,15 +1434,31 @@ export class App implements OnDestroy {
     }
   }
 
-  protected downloadAudioClip(clip: AudioClip): void {
-    const url = this.getAudioUrl(clip.id);
-    if (!url) {
-      return;
+  protected async downloadAudioClip(clip: AudioClip): Promise<void> {
+    try {
+      await this.nativeFileService.saveOrShare(clip.fileName, clip.blob);
+    } catch (error) {
+      this.audioError.set(formatRecordingError(error));
     }
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = clip.fileName;
-    anchor.click();
+  }
+
+  protected async downloadImportTemplate(event: Event): Promise<void> {
+    event.preventDefault();
+    this.storageError.set('');
+    try {
+      const response = await fetch('./modello-importazione-diario.json');
+      if (!response.ok) {
+        throw new Error(`Impossibile scaricare il modello (HTTP ${response.status}).`);
+      }
+      await this.nativeFileService.saveOrShare(
+        'modello-importazione-diario.json',
+        await response.blob(),
+      );
+    } catch (error) {
+      this.storageError.set(
+        error instanceof Error ? error.message : 'Impossibile scaricare il modello JSON.',
+      );
+    }
   }
 
   protected getAudioUrl(clipId: string): string {
@@ -1504,12 +1522,7 @@ export class App implements OnDestroy {
           'Il backup supera il limite di 120 MiB e non può essere esportato in un unico file.',
         );
       }
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = 'diario-rumore-backup.ndbackup';
-      anchor.click();
-      URL.revokeObjectURL(url);
+      await this.nativeFileService.saveOrShare('diario-rumore-backup.ndbackup', blob);
       this.importStatus.set(
         `Backup cifrato creato con ${events.length} episodi e ${audioClips.length} registrazioni audio.`,
       );
