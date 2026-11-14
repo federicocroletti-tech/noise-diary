@@ -62,6 +62,7 @@ test.describe('Layout e stili di base', () => {
     await expect(overview).not.toHaveClass(/panel/);
     const cards = overview.locator('.stat-card');
     await expect(cards).toHaveCount(4);
+    await expect(cards.nth(3)).toContainText('Intensità media');
     await expect(cards.nth(3)).toContainText('Non disponibile');
 
     const tops = new Set(

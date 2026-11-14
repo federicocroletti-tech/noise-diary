@@ -99,7 +99,7 @@
             [disabled]="authBusy()"
             (click)="returnToAccount()"
           >
-            Torna all?account
+            Torna all’account
           </button>
           <button
             *ngIf="accountMode() === 'signed-in'"
@@ -112,7 +112,7 @@
           </button>
           <hr />
           <button type="button" class="menu-item danger" [disabled]="authBusy()" (click)="deleteLocalDiary()">
-            {{ accountMode() === 'signed-in' ? 'Elimina diario account?' : 'Elimina diario locale?' }}
+            {{ accountMode() === 'signed-in' ? 'Elimina diario account…' : 'Elimina diario locale…' }}
           </button>
         </div>
       </details>
@@ -161,7 +161,7 @@
           </label>
           <button type="submit" class="primary" [disabled]="accountBusy()">Accedi</button>
         </form>
-        <div class="audio-file-actions">
+        <div class="actions">
           <button type="button" class="secondary" (click)="setAccountMode('signup')">Crea account</button>
           <button type="button" class="secondary" (click)="setAccountMode('forgot-password')">
             Password dimenticata?
@@ -501,7 +501,7 @@
         aria-label="Chiave di recupero del diario"
       />
     </label>
-    <div class="audio-file-actions">
+    <div class="actions">
       <button type="button" class="secondary" (click)="recoveryDisplay.select()">
         Seleziona chiave
       </button>
@@ -550,7 +550,7 @@
         <ng-template #noLatest><strong class="empty-value">Nessuno</strong></ng-template>
       </div>
       <div class="stat-card">
-        <span class="label">Intensit? media</span>
+        <span class="label">Intensità media</span>
         <strong [class.empty-value]="averageIntensity() === 'Non disponibile'"
           >{{ averageIntensity() }}<small *ngIf="averageIntensity() !== 'Non disponibile'"> /5</small></strong
         >
@@ -696,7 +696,7 @@
           </label>
         </li>
       </ul>
-      <div class="audio-file-actions">
+      <div class="actions">
         <button type="button" class="secondary" (click)="cancelAppendImport()">
           Annulla importazione
         </button>
@@ -1002,7 +1002,7 @@
             </label>
           </fieldset>
 
-          <div class="audio-file-actions">
+          <div class="form-actions">
             <button type="submit" class="primary submit">
               {{ editingEventId() ? 'Salva correzione' : 'Salva evento' }}
             </button>
@@ -1107,7 +1107,7 @@
           <p>{{ event.description }}</p>
         </div>
 
-        <div class="audio-file-actions">
+        <div class="actions detail-actions">
           <button
             type="button"
             class="secondary"
