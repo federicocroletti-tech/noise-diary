@@ -99,7 +99,7 @@
             [disabled]="authBusy()"
             (click)="returnToAccount()"
           >
-            Torna all?account
+            Torna all’account
           </button>
           <button
             *ngIf="accountMode() === 'signed-in'"
@@ -112,7 +112,7 @@
           </button>
           <hr />
           <button type="button" class="menu-item danger" [disabled]="authBusy()" (click)="deleteLocalDiary()">
-            {{ accountMode() === 'signed-in' ? 'Elimina diario account?' : 'Elimina diario locale?' }}
+            {{ accountMode() === 'signed-in' ? 'Elimina diario account…' : 'Elimina diario locale…' }}
           </button>
         </div>
       </details>
@@ -550,7 +550,7 @@
         <ng-template #noLatest><strong class="empty-value">Nessuno</strong></ng-template>
       </div>
       <div class="stat-card">
-        <span class="label">Intensit? media</span>
+        <span class="label">Intensità media</span>
         <strong [class.empty-value]="averageIntensity() === 'Non disponibile'"
           >{{ averageIntensity() }}<small *ngIf="averageIntensity() !== 'Non disponibile'"> /5</small></strong
         >
