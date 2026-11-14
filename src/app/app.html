@@ -573,7 +573,11 @@
         CSV, Excel, Word e PDF non sono accettati. Limite per file: 120 MiB.
       </p>
       <p>
-        <a href="modello-importazione-diario.json" download="modello-importazione-diario.json">
+        <a
+          href="modello-importazione-diario.json"
+          download="modello-importazione-diario.json"
+          (click)="downloadImportTemplate($event)"
+        >
           Scarica il modello JSON con un episodio di esempio
         </a>
       </p>

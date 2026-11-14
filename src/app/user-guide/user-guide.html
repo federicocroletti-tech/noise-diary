@@ -193,9 +193,14 @@
     <h4>Prepara un JSON a mano</h4>
     <ol>
       <li>
-        <a href="modello-importazione-diario.json" download="modello-importazione-diario.json">
+        <a
+          href="modello-importazione-diario.json"
+          download="modello-importazione-diario.json"
+          (click)="downloadTemplate($event)"
+        >
           Scarica il modello JSON compilabile
         </a>
+        <p *ngIf="downloadError()" role="alert">{{ downloadError() }}</p>
         e sostituisci i dati fittizi con i tuoi.
       </li>
       <li>
