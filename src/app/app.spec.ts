@@ -267,6 +267,7 @@ describe('App', () => {
     expect(accountService.signIn).toHaveBeenCalledWith(user.email, 'account-password-2026');
     expect(cloudDiary.loadEvents).toHaveBeenCalledOnce();
     expect(compiled.textContent).toContain('Account · person@example.com');
+    clickButton(fixture, 'Nuovo episodio');
     expect(compiled.textContent).toContain('Dati associati al tuo account');
     fixture.destroy();
   });
@@ -538,14 +539,14 @@ describe('App', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     await vi.waitFor(() => {
       fixture.detectChanges();
-      expect(compiled.querySelectorAll('.event-list li')).toHaveLength(2);
+      expect(compiled.querySelectorAll('.event-list > li')).toHaveLength(2);
       expect(compiled.textContent).not.toContain('Caricamento del diario account');
     });
     const staleAudio = deferred<AudioClip[]>();
     const currentClip = syntheticClip('latest-selection');
     cloudAudio.listByEvent.mockReturnValueOnce(staleAudio.promise).mockResolvedValueOnce([]).mockResolvedValueOnce([currentClip]);
     const { createObjectURL } = mockObjectUrls();
-    const items = compiled.querySelectorAll<HTMLElement>('.event-list li');
+    const items = compiled.querySelectorAll<HTMLElement>('.event-list .event-row');
     items[0].click();
     items[1].click();
     items[0].click();
@@ -568,7 +569,7 @@ describe('App', () => {
     audioClips.listByEvent.mockReturnValueOnce(oldAudio.promise).mockResolvedValueOnce([currentClip]);
     const { createObjectURL } = mockObjectUrls();
     const compiled = fixture.nativeElement as HTMLElement;
-    compiled.querySelector<HTMLElement>('.event-list li')?.click();
+    compiled.querySelector<HTMLElement>('.event-list .event-row')?.click();
     await vi.waitFor(() => expect(audioClips.listByEvent).toHaveBeenCalledTimes(2));
 
     const secondProfile = {
@@ -746,6 +747,7 @@ describe('App', () => {
     await createVault(fixture);
 
     expect(compiled.textContent).toContain('Nessun episodio nel diario');
+    clickButton(fixture, 'Nuovo episodio');
     expect(compiled.querySelectorAll<HTMLSelectElement>('.event-form select')[1].value).toBe(
       'unknown',
     );
@@ -760,6 +762,7 @@ describe('App', () => {
   it('groups the form fields and labels required inputs', async () => {
     const fixture = await createLocalFixture();
     await createVault(fixture);
+    clickButton(fixture, 'Nuovo episodio');
 
     const compiled = fixture.nativeElement as HTMLElement;
     const groups = [...compiled.querySelectorAll('.event-form fieldset')].map(
@@ -810,7 +813,7 @@ describe('App', () => {
     await createVault(fixture);
 
     const compiled = fixture.nativeElement as HTMLElement;
-    compiled.querySelector<HTMLElement>('.event-list li')?.click();
+    compiled.querySelector<HTMLElement>('.event-list .event-row')?.click();
     fixture.detectChanges();
     compiled.querySelector<HTMLButtonElement>('button[aria-label="Modifica episodio"]')?.click();
     fixture.detectChanges();
@@ -892,6 +895,7 @@ describe('App', () => {
   it('creates a draft with a five-level subjective intensity and shows local audio controls', async () => {
     const fixture = await createLocalFixture();
     await createVault(fixture);
+    clickButton(fixture, 'Nuovo episodio');
 
     const compiled = fixture.nativeElement as HTMLElement;
     const intensity = compiled.querySelector<HTMLInputElement>('input[type="range"]');
@@ -1057,7 +1061,7 @@ describe('App', () => {
       ?.click();
     fixture.detectChanges();
 
-    expect(compiled.querySelectorAll('.event-list li')).toHaveLength(1);
+    expect(compiled.querySelectorAll('.event-list > li')).toHaveLength(1);
   });
 
   it('summarizes recent activity in the overview', async () => {

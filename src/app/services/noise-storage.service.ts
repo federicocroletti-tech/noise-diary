@@ -189,6 +189,8 @@ export class NoiseStorageService {
       locationLabel: typeof source.locationLabel === 'string' ? source.locationLabel : '',
       room: typeof source.room === 'string' ? source.room : '',
       microphonePosition: this.optionalString(source.microphonePosition),
+      planX: this.optionalRatio(source.planX),
+      planY: this.optionalRatio(source.planY),
       windowsState: this.optionalString(source.windowsState),
       doorsState: this.optionalString(source.doorsState),
       eventType,
@@ -250,6 +252,10 @@ export class NoiseStorageService {
 
   private optionalString(value: unknown): string | undefined {
     return typeof value === 'string' && value ? value : undefined;
+  }
+
+  private optionalRatio(value: unknown): number | undefined {
+    return typeof value === 'number' && value >= 0 && value <= 1 ? value : undefined;
   }
 
   private optionalNumber(value: unknown): number | undefined {

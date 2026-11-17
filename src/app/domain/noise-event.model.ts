@@ -128,6 +128,8 @@ export interface NoiseEvent {
   locationLabel: string;
   room: string;
   microphonePosition?: string;
+  planX?: number;
+  planY?: number;
   windowsState?: string;
   doorsState?: string;
   eventType: NoiseEventType;
@@ -213,6 +215,8 @@ export function isNoiseEvent(value: unknown): value is NoiseEvent {
     typeof event.locationLabel === 'string' &&
     typeof event.room === 'string' &&
     (event.microphonePosition === undefined || typeof event.microphonePosition === 'string') &&
+    (event.planX === undefined || (typeof event.planX === 'number' && event.planX >= 0 && event.planX <= 1)) &&
+    (event.planY === undefined || (typeof event.planY === 'number' && event.planY >= 0 && event.planY <= 1)) &&
     (event.windowsState === undefined || typeof event.windowsState === 'string') &&
     (event.doorsState === undefined || typeof event.doorsState === 'string') &&
     typeof event.eventType === 'string' &&
