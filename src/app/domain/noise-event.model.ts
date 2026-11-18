@@ -130,6 +130,8 @@ export interface NoiseEvent {
   microphonePosition?: string;
   planX?: number;
   planY?: number;
+  /** Locale della planimetria su cui è espresso il punto di origine percepita (planX/planY). */
+  planId?: string;
   windowsState?: string;
   doorsState?: string;
   eventType: NoiseEventType;
@@ -217,6 +219,7 @@ export function isNoiseEvent(value: unknown): value is NoiseEvent {
     (event.microphonePosition === undefined || typeof event.microphonePosition === 'string') &&
     (event.planX === undefined || (typeof event.planX === 'number' && event.planX >= 0 && event.planX <= 1)) &&
     (event.planY === undefined || (typeof event.planY === 'number' && event.planY >= 0 && event.planY <= 1)) &&
+    (event.planId === undefined || typeof event.planId === 'string') &&
     (event.windowsState === undefined || typeof event.windowsState === 'string') &&
     (event.doorsState === undefined || typeof event.doorsState === 'string') &&
     typeof event.eventType === 'string' &&

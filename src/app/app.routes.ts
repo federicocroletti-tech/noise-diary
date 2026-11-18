@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { sessionGuard } from './floor-map/session.guard';
 
 export const routes: Routes = [
   {
@@ -9,6 +10,7 @@ export const routes: Routes = [
   {
     path: 'mappa',
     title: 'Mappa della casa | Diario Rumore',
+    canActivate: [sessionGuard],
     loadComponent: () => import('./floor-map/floor-map').then(({ FloorMap }) => FloorMap),
   },
   { path: '', pathMatch: 'full', children: [], title: 'Diario Rumore' },
