@@ -162,7 +162,7 @@
           </label>
           <button type="submit" class="primary" [disabled]="accountBusy()">Accedi</button>
         </form>
-        <div class="audio-file-actions">
+        <div class="actions">
           <button type="button" class="secondary" (click)="setAccountMode('signup')">Crea account</button>
           <button type="button" class="secondary" (click)="setAccountMode('forgot-password')">
             Password dimenticata?
@@ -502,7 +502,7 @@
         aria-label="Chiave di recupero del diario"
       />
     </label>
-    <div class="audio-file-actions">
+    <div class="actions">
       <button type="button" class="secondary" (click)="recoveryDisplay.select()">
         Seleziona chiave
       </button>
@@ -701,7 +701,7 @@
           </label>
         </li>
       </ul>
-      <div class="audio-file-actions">
+      <div class="actions">
         <button type="button" class="secondary" (click)="cancelAppendImport()">
           Annulla importazione
         </button>
@@ -1007,7 +1007,7 @@
             </label>
           </fieldset>
 
-          <div class="audio-file-actions">
+          <div class="form-actions">
             <button type="submit" class="primary submit">
               {{ editingEventId() ? 'Salva correzione' : 'Salva evento' }}
             </button>
@@ -1122,7 +1122,7 @@
           <p>{{ event.description }}</p>
         </div>
 
-        <div class="audio-file-actions">
+        <div class="actions detail-actions">
           <button
             type="button"
             class="secondary"

@@ -9,7 +9,6 @@ test.describe('Lista episodi', () => {
   test('il diario vuoto offre di creare il primo episodio e sposta il focus sul modulo', async ({
     page,
   }) => {
-    await page.getByRole('button', { name: 'Nascondi modulo' }).click();
     await expect(page.locator('form.event-form')).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Crea il primo episodio' }).click();
@@ -45,6 +44,6 @@ test.describe('Lista episodi', () => {
     await expect(page.getByText('Nessun episodio nel diario')).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Cancella ricerca' }).click();
-    await expect(page.locator('.event-list li')).toHaveCount(1);
+    await expect(page.locator('.event-list > li')).toHaveCount(1);
   });
 });

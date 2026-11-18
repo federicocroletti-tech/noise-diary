@@ -288,15 +288,15 @@ small {
   gap: 12px;
 }
 
-.submit {
-  margin-top: 8px;
-}
-
 .filters {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 16px;
+}
+
+.detail-actions {
+  justify-content: space-between;
 }
 
 .filters input {

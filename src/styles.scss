@@ -94,6 +94,37 @@ button.danger {
   background: rgba(127, 29, 29, 0.4);
 }
 
+.actions,
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.form-actions {
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.form-actions button.primary {
+  min-width: 180px;
+}
+
+@media (max-width: 640px) {
+  .form-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .form-actions button.primary {
+    min-width: 0;
+  }
+}
+
 details.menu {
   position: relative;
 }

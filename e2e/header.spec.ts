@@ -35,6 +35,7 @@ test.describe('Intestazione', () => {
 
   test('mostra solo le azioni principali e il titolo su una riga', async ({ page }) => {
     const header = page.locator('header.topbar');
+    await header.getByRole('button', { name: 'Nuovo episodio' }).click();
     await expect(header.getByRole('button', { name: 'Nascondi modulo' })).toBeVisible();
     await expect(header.getByText('Backup', { exact: true })).toBeVisible();
     await expect(header.getByText('Profilo', { exact: true })).toBeVisible();
@@ -67,11 +68,10 @@ test.describe('Intestazione', () => {
     await expect(header.getByRole('button', { name: 'Elimina diario locale…' })).toBeVisible();
     await expect(header.getByRole('button', { name: 'Torna all’account' })).toBeVisible();
     await page.locator('.disclaimer').click();
-    await expect(header.getByRole('button', { name: /Elimina diario locale/ })).toBeHidden();
+    await expect(header.getByRole('button', { name: 'Elimina diario locale…' })).toBeHidden();
   });
 
   test('il pulsante Nuovo episodio apre il modulo con il focus su Luogo', async ({ page }) => {
-    await page.getByRole('button', { name: 'Nascondi modulo' }).click();
     await page.getByRole('button', { name: 'Nuovo episodio' }).click();
 
     await expect(page.locator('form.event-form').getByLabel('Luogo')).toBeFocused();
@@ -80,6 +80,7 @@ test.describe('Intestazione', () => {
   test('la guida mantiene il modulo in compilazione e offre il modello importabile', async ({
     page,
   }) => {
+    await page.getByRole('button', { name: 'Nuovo episodio' }).click();
     const form = page.locator('form.event-form');
     await form.getByLabel('Luogo').fill('Luogo sintetico da conservare');
     await form.getByLabel('Descrizione').fill('Appunti sintetici non ancora salvati.');

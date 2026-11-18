@@ -4,6 +4,7 @@ import { openLocalDiary } from './fixtures';
 test.describe('Modulo episodio', () => {
   test.beforeEach(async ({ page }) => {
     await openLocalDiary(page);
+    await page.getByRole('button', { name: 'Nuovo episodio' }).click();
   });
 
   test('raggruppa i campi e chiarisce luogo e stanza', async ({ page }) => {
@@ -36,5 +37,21 @@ test.describe('Modulo episodio', () => {
     const detail = page.locator('.detail-panel');
     await expect(detail).toContainText('Aperta');
     await expect(detail).toContainText('Socchiusa');
+  });
+
+  test('il pulsante di salvataggio ha dimensioni piene ed è separato dai campi', async ({
+    page,
+  }) => {
+    const actions = page.locator('form.event-form .form-actions');
+    const save = actions.getByRole('button', { name: 'Salva evento' });
+    const style = await save.evaluate((element) => {
+      const computed = getComputedStyle(element);
+      return { fontSize: parseFloat(computed.fontSize), height: element.getBoundingClientRect().height };
+    });
+    expect(style.fontSize).toBeGreaterThanOrEqual(15);
+    expect(style.height).toBeGreaterThanOrEqual(44);
+    expect(await actions.evaluate((element) => getComputedStyle(element).borderTopStyle)).toBe(
+      'solid',
+    );
   });
 });
