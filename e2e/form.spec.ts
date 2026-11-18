@@ -4,6 +4,7 @@ import { openLocalDiary } from './fixtures';
 test.describe('Modulo episodio', () => {
   test.beforeEach(async ({ page }) => {
     await openLocalDiary(page);
+    await page.getByRole('button', { name: 'Nuovo episodio' }).click();
   });
 
   test('raggruppa i campi e chiarisce luogo e stanza', async ({ page }) => {

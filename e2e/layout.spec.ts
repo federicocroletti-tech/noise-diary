@@ -64,6 +64,7 @@ test.describe('Layout e stili di base', () => {
     await expect(cards).toHaveCount(4);
     await expect(cards.nth(3)).toContainText('Intensità media');
     await expect(cards.nth(3)).toContainText('Non disponibile');
+    await expect(overview).not.toContainText(/\p{L}\?\p{L}/u);
 
     const tops = new Set(
       await cards.evaluateAll((elements) =>

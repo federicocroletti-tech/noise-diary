@@ -1,62 +1,39 @@
 # Handoff di sessione
 
-**Aggiornato:** 2026-11-01
+Aggiornato: **2026-11-14**.
 
-**Repository:** `federicocroletti-tech/noise-diary`
+## Leggere prima
 
-## Stato raggiunto
+1. [Stato corrente](../PROJECT_STATUS.md): inventario di funzionalita', codice,
+   grafica, impostazioni, configurazione, regole e limiti verificati nel checkout.
+2. [Architettura](./CURRENT_ARCHITECTURE.md): responsabilita' e flussi dati.
+3. [Guida utente](./guida-utente.md): comportamento destinato all'utente.
+4. [Evoluzione NOYSE](./NOYSE_EVOLUTION.md): backlog storico, non inventario attuale.
 
-- Fase 0 di audit completata e documentata in `PROJECT_AUDIT.md`, `CURRENT_ARCHITECTURE.md`, `LEGAL_PRIVACY_BOUNDARIES.md`, `SECURITY_THREAT_MODEL.md`, `ROADMAP.md`, `OPEN_QUESTIONS.md` e `DATA_CLASSIFICATION.md`.
-- Le fixture che contenevano un possibile dato residenziale sono state sostituite localmente con valori sintetici in `src/app/app.spec.ts` e `src/app/services/noise-storage.service.spec.ts`.
-- I branch `audit/repository-assessment` e `fix/sanitize-test-fixtures` derivano dal commit `c4b56b3`; il primo contiene i documenti audit, entrambi contengono la stessa sanificazione delle fixture.
-- PR #1 è stata integrata con squash nel commit `18bbba8`; PR #2 nel commit `c079e7a`. Entrambi i branch sono stati pushati e `main` locale è sincronizzato con `origin/main`.
-- Nessun commit pubblico è stato riscritto. La cronologia remota precedente conserva ancora le fixture originali; questo handoff non include né riproduce il dato.
+## Contesto essenziale per il prossimo prompt
 
-## Verifiche
+- Repository `federicocroletti-tech/noise-diary`; branch rilevato
+  `feat/android-apk`, base iniziale `9b24436`. Controllare nuovamente Git.
+- Account **Neon** gia' implementati, non Supabase da configurare. Cloud
+  PostgreSQL/Object Storage protetto da Auth/RLS, **non cifrato end-to-end**.
+- Profili locali indipendenti con vault cifrato e recupero; cloud e locale si
+  trasferiscono solo tramite backup/import esplicito.
+- Guida integrata con routing; test E2E desktop/mobile gia' presenti.
+- Android Capacitor in lavorazione. Esistono modifiche applicative non
+  committate e file Android/nativi non tracciati: non eliminarli, ricrearli o
+  includerli incidentalmente in commit documentali.
+- Questo aggiornamento riguarda solo documenti; niente test applicativi,
+  build, modifiche provider, push o deploy. Stato live non verificato.
+- Esiti e conteggi dei test del 1/8 novembre sono storici, non garanzie sul
+  checkout corrente. Comandi e limiti sono nello stato progetto.
 
-- `npm ci`: completato, 0 vulnerabilità riportate da npm.
-- `npm test`: 5 file, 18 test superati.
-- `npm run build`: superata; resta il warning preesistente sul budget di `src/app/app.scss`.
+## Vincoli
 
-- `git diff --check`: superato.
-- `npm run lint`: non superato per 57 file preesistenti.
-- `npm run content:check`: non superato perché `situations/README.md` è fuori sync; revisore del contenuto pilota non assegnato.
+Preservare dati e compatibilita' backup, usare solo fixture sintetiche,
+non committare segreti o `.ndbackup`, non riscrivere la cronologia.
+Seguire [governance](../GOVERNANCE.md), [privacy](../PRIVACY.md) e
+[regole editoriali](./content-review-policy.md). Il prodotto non certifica
+misurazioni acustiche e non fornisce accertamenti o consulenza professionale.
 
-## Da dove ripartire
-
-### Completato
-
-- [x] Analizzare repository, stack, architettura, sicurezza, privacy, test e CI.
-- [x] Creare i sette documenti della Fase 0.
-- [x] Sostituire le fixture con dati sintetici e verificare test/build.
-- [x] Conservare questo handoff e il prompt iniziale in documentazione versionata.
-- [x] Committare e pubblicare i branch audit e fixture, poi integrarli in `main` senza force-push.
-
-### Prossima sessione
-
-1. Controllare i workflow e il deploy GitHub Pages dopo i merge in `main`.
-2. Leggere e approvare i documenti audit; risolvere le domande in [OPEN_QUESTIONS.md](./OPEN_QUESTIONS.md).
-3. Decidere separatamente se chiedere una bonifica della cronologia/cache pubblica. I commit normali non rimuovono i dati dalle revisioni precedenti; non usare force-push o purge senza autorizzazione esplicita e coordinamento con GitHub.
-4. Prima di nuove feature, stabilire gate CI per evitare dati reali in test, documenti, screenshot e commit.
-5. Solo dopo l’approvazione dell’audit, pianificare `feat/noise-event-domain` con timezone, distinzione tra osservazioni/ipotesi, schema versionato e history delle correzioni.
-
-Nessuna nuova feature è stata implementata in questa sessione. Nessun dato del diario o registrazione è stato creato o modificato.
-
-## Aggiornamento 2026-11-11: repo satellite
-
-Sono stati creati 6 repository privati su `federicocroletti-tech`, ciascuno con README, LICENSE (tutti i diritti riservati), DATA_SOURCES.md e DESIGN.md (solo progettazione, nessun codice):
-
-- `noise-notice-recipients-ipa`: destinatari ufficiali da IPA (CC BY 4.0, API CKAN). Priorità 1.
-- `noise-competent-authority-index`: indice delle competenze per giurisdizione.
-- `noise-acoustic-zone-checker`: classe acustica per punto. Spike obbligatorio sui dati.
-- `noise-diary-legal-context`: contesto normativo indicativo sugli eventi. Dipende dal precedente.
-- `noise-anonymous-area-map`: mappa aggregata anonima. Bloccata da valutazione GDPR/DPIA.
-- `noise-territory-dashboard`: livelli territoriali sugli eventi. Dopo i precedenti.
-
-Esiti della verifica dati:
-
-- Zonizzazione acustica del Comune di Milano non individuata come open data su `dati.comune.milano.it` né su `dati.gov.it`. Esiste il dataset regionale `dh6e-qy9d` (dati.lombardia.it, CC0): da verificare se contiene Milano.
-- Nessun dataset "cantieri" su `dati.comune.milano.it`.
-- Il solo dataset acustico di Milano trovato è DS1678 (controlli rumore aggregati 2012-2022, non aggiornato).
-
-Prossimi passi: spike IPA (campi e volumi), spike sul dataset regionale per Milano, decisione sullo stack condiviso (libreria TypeScript riusabile). Le identità dei commit dei repo satellite usano l'email noreply personale, non quella aziendale.
+Le note pregresse sui repository satellite sono recuperabili nella cronologia
+Git di questo documento; non sono integrazioni verificate in questa analisi.

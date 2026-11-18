@@ -8,7 +8,9 @@ import {
   Injector,
   OnDestroy,
   signal,
+  effect,
 } from '@angular/core';
+import { MapContext } from './floor-map/map-context.service';
 import { AudioClip, AudioClipKind } from './audio/models/audio-clip.model';
 import { AudioClipRepository } from './audio/audio-clip.repository';
 import {
@@ -33,6 +35,7 @@ import { LocalDiaryProfile, LocalProfileService } from './services/local-profile
 import { AccountUser, NeonAuthService } from './services/neon-auth.service';
 import { NeonAudioRepository } from './services/neon-audio.repository';
 import { NeonDiaryService } from './services/neon-diary.service';
+import { NativeFileService } from './services/native-file.service';
 
 type SortMode = 'recent' | 'intensity' | 'room';
 type DiaryView = 'list' | 'form' | 'detail';
@@ -127,6 +130,7 @@ const EMPTY_DRAFT: NoiseEventDraft = {
 })
 export class App implements OnDestroy {
   private readonly injector = inject(Injector);
+  private readonly mapContext = inject(MapContext);
   private diaryRevision = 0;
   private audioRequestId = 0;
 
@@ -161,7 +165,7 @@ export class App implements OnDestroy {
   protected readonly authStatus = signal('');
   protected readonly authBusy = signal(false);
   protected readonly deletingDiary = signal(false);
-  protected readonly showForm = signal(true);
+  protected readonly showForm = signal(false);
   protected readonly activeView = signal<DiaryView>('list');
   protected readonly editingEventId = signal<string | null>(null);
   protected readonly correctionReason = signal('');
@@ -308,8 +312,27 @@ export class App implements OnDestroy {
     private readonly accountService: NeonAuthService,
     private readonly neonDiary: NeonDiaryService,
     private readonly neonAudioRepository: NeonAudioRepository,
+    private readonly nativeFileService: NativeFileService,
   ) {
+    effect(() => this.mapContext.events.set(this.events()));
+    this.mapContext.placeEvent = (id, x, y) => this.setEventPlan(id, x, y);
     void this.initialize();
+  }
+
+  private async setEventPlan(id: string, x: number | null, y: number | null): Promise<void> {
+    const updatedEvents = this.events().map((item) => {
+      if (item.id !== id) {
+        return item;
+      }
+      const { planX: _x, planY: _y, ...rest } = item;
+      return {
+        ...rest,
+        ...(x === null || y === null ? {} : { planX: x, planY: y }),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    await this.saveEventsForActiveDiary(updatedEvents);
+    this.events.set(updatedEvents);
   }
 
   protected setAccountMode(mode: AccountMode): void {
@@ -1432,15 +1455,31 @@ export class App implements OnDestroy {
     }
   }
 
-  protected downloadAudioClip(clip: AudioClip): void {
-    const url = this.getAudioUrl(clip.id);
-    if (!url) {
-      return;
+  protected async downloadAudioClip(clip: AudioClip): Promise<void> {
+    try {
+      await this.nativeFileService.saveOrShare(clip.fileName, clip.blob);
+    } catch (error) {
+      this.audioError.set(formatRecordingError(error));
     }
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = clip.fileName;
-    anchor.click();
+  }
+
+  protected async downloadImportTemplate(event: Event): Promise<void> {
+    event.preventDefault();
+    this.storageError.set('');
+    try {
+      const response = await fetch('./modello-importazione-diario.json');
+      if (!response.ok) {
+        throw new Error(`Impossibile scaricare il modello (HTTP ${response.status}).`);
+      }
+      await this.nativeFileService.saveOrShare(
+        'modello-importazione-diario.json',
+        await response.blob(),
+      );
+    } catch (error) {
+      this.storageError.set(
+        error instanceof Error ? error.message : 'Impossibile scaricare il modello JSON.',
+      );
+    }
   }
 
   protected getAudioUrl(clipId: string): string {
@@ -1504,12 +1543,7 @@ export class App implements OnDestroy {
           'Il backup supera il limite di 120 MiB e non può essere esportato in un unico file.',
         );
       }
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = 'diario-rumore-backup.ndbackup';
-      anchor.click();
-      URL.revokeObjectURL(url);
+      await this.nativeFileService.saveOrShare('diario-rumore-backup.ndbackup', blob);
       this.importStatus.set(
         `Backup cifrato creato con ${events.length} episodi e ${audioClips.length} registrazioni audio.`,
       );
@@ -1670,7 +1704,7 @@ export class App implements OnDestroy {
     this.intensityUnreported.set(false);
     this.effectsUnreported.set(false);
     this.draft.set({ ...EMPTY_DRAFT, startedAt: currentLocalDateTime() });
-    this.showForm.set(true);
+    this.showForm.set(false);
     this.pendingAppendImport.set(null);
     this.recoveryCode.set('');
     this.recoveryCodeSaved.set(false);

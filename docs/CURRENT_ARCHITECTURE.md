@@ -1,5 +1,10 @@
 # Architettura attuale
 
+> Contesto aggiornato al 2026-11-14: leggere prima
+> [lo stato del progetto](../PROJECT_STATUS.md). Il checkout include anche
+> lavoro Android non committato; disponibilita' online e configurazione remota
+> non sono state riconfermate.
+
 ## Vista d’insieme
 
 ```mermaid
@@ -59,7 +64,8 @@ La modalità locale cifra eventi e byte audio prima di scriverli in IndexedDB. L
 - `database/migrations/001_user_diaries.sql` definisce le tabelle cloud, chiavi composte, relazione audio-evento e policy RLS.
 - `src/app/audio/audio-recording.service.ts` acquisisce il microfono solo su comando esplicito, calcola l’hash iniziale e applica limiti di registrazione.
 - `src/app/audio/audio-clip.repository.ts` cifra e conserva contenuto e metadati audio in IndexedDB.
-- `src/app/app.routes.ts` esporta un array di route vuoto; l’app è una sola vista/component tree.
+- `src/app/app.routes.ts` configura la guida integrata; `App` mantiene il diario e ospita il `router-outlet` della guida.
+- `capacitor.config.ts` configura il contenitore Android. Il servizio file nativo presente nel working tree usa Filesystem/Share per export e condivisione, mantenendo il download browser come percorso web; parte dell'integrazione non e' ancora versionata.
 
 ## Flusso di accesso e persistenza
 

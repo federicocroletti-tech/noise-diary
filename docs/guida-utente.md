@@ -129,6 +129,8 @@ Nel cloud un errore di rete o storage può lasciare un’importazione parziale: 
 
 Se il browser lo consente, puoi installare la PWA dal suo menu **Installa app** o **Aggiungi alla schermata Home**. L’installazione non crea un backup e non trasforma il profilo locale in un account.
 
+Su Android puoi anche installare l’app nativa: [scarica l’ultima versione dell’APK](https://github.com/federicocroletti-tech/noise-diary/releases/latest/download/diario-rumore.apk), aprila e consenti l’installazione quando Android lo chiede. Accedi con lo stesso account: episodi e audio sono condivisi con il sito, ma serve Internet. Gli aggiornamenti si installano sopra la versione esistente. Dettagli nella [guida Android](./android-app.md).
+
 Dal menu Account o Profilo puoi eliminare l’intero diario con conferma esplicita. Questa operazione elimina gli episodi e gli audio dell’archivio selezionato, non i file scaricati, i backup esportati o gli altri profili locali.
 
 - Non pubblicare episodi reali, registrazioni, chiavi o password nel repository.

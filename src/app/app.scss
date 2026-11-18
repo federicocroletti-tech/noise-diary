@@ -74,10 +74,14 @@ h1 {
 }
 
 .workspace {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  display: flex;
+  flex-direction: column;
+  width: 100%;
   gap: 20px;
-  align-items: start;
+}
+
+.workspace > .panel {
+  width: 100%;
 }
 
 .panel {
@@ -319,21 +323,28 @@ small {
   gap: 12px;
 }
 
-.event-list li {
+.event-list > li {
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 14px 16px;
   background: rgba(15, 23, 42, 0.55);
-  cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    transform 0.2s ease;
+  transition: border-color 0.2s ease;
 }
 
-.event-list li:hover,
-.event-list li.active {
+.event-row {
+  cursor: pointer;
+}
+
+.event-list > li:hover,
+.event-list > li.active {
   border-color: rgba(110, 231, 249, 0.7);
-  transform: translateY(-1px);
+}
+
+.event-list .detail-panel {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  cursor: default;
 }
 
 .event-header {

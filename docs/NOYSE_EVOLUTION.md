@@ -1,5 +1,10 @@
 # NOYSE: analisi e piano di evoluzione
 
+> Fotografia storica del 2026-11-10, non inventario attuale.
+> Per il checkout del 2026-11-14 leggere [PROJECT_STATUS.md](../PROJECT_STATUS.md):
+> guida con routing, test E2E e lavoro Android Capacitor sono successivi.
+> Le assenze riportate sotto vanno ricontrollate prima di aprire nuovi task.
+
 Data: 2026-11-10. Repository personale: `federicocroletti-tech/noise-diary`.
 
 ## Ambito e metodo

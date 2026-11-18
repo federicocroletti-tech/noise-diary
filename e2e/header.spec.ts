@@ -63,7 +63,9 @@ test.describe('Intestazione', () => {
     await expect(exportButton).toBeHidden();
 
     await header.getByText('Profilo', { exact: true }).click();
+    await expect(header.getByRole('button', { name: /Elimina diario locale/ })).toBeVisible();
     await expect(header.getByRole('button', { name: 'Elimina diario locale…' })).toBeVisible();
+    await expect(header.getByRole('button', { name: 'Torna all’account' })).toBeVisible();
     await page.locator('.disclaimer').click();
     await expect(header.getByRole('button', { name: 'Elimina diario locale…' })).toBeHidden();
   });

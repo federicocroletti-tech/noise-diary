@@ -193,9 +193,14 @@
     <h4>Prepara un JSON a mano</h4>
     <ol>
       <li>
-        <a href="modello-importazione-diario.json" download="modello-importazione-diario.json">
+        <a
+          href="modello-importazione-diario.json"
+          download="modello-importazione-diario.json"
+          (click)="downloadTemplate($event)"
+        >
           Scarica il modello JSON compilabile
         </a>
+        <p *ngIf="downloadError()" role="alert">{{ downloadError() }}</p>
         e sostituisci i dati fittizi con i tuoi.
       </li>
       <li>
@@ -259,6 +264,17 @@
       Se il browser lo consente, puoi installare la PWA dal suo menu
       <strong>Installa app</strong> o <strong>Aggiungi alla schermata Home</strong>. L’installazione
       non crea un backup e non trasforma il profilo locale in un account.
+    </p>
+    <p>
+      Su Android puoi anche installare l’app nativa:
+      <a
+        href="https://github.com/federicocroletti-tech/noise-diary/releases/latest/download/diario-rumore.apk"
+        target="_blank"
+        rel="noopener noreferrer"
+        >scarica l’ultima versione dell’APK</a
+      >, aprila e consenti l’installazione quando Android lo chiede. Accedi con lo stesso account:
+      episodi e audio sono condivisi con il sito, ma serve Internet. Gli aggiornamenti si installano
+      sopra la versione esistente.
     </p>
     <p>
       Dal menu Account o Profilo puoi eliminare l’intero diario con conferma esplicita. Questa

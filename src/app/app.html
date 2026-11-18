@@ -22,6 +22,7 @@
       >
         {{ guideOpen() ? 'Torna all’app' : 'Guida all’uso' }}
       </a>
+      <a *ngIf="!guideOpen()" class="guide-link" routerLink="/mappa">Mappa</a>
       <ng-container *ngIf="diaryOpen() && !recoveryCode() && !guideOpen()">
       <button
         type="button"
@@ -573,7 +574,11 @@
         CSV, Excel, Word e PDF non sono accettati. Limite per file: 120 MiB.
       </p>
       <p>
-        <a href="modello-importazione-diario.json" download="modello-importazione-diario.json">
+        <a
+          href="modello-importazione-diario.json"
+          download="modello-importazione-diario.json"
+          (click)="downloadImportTemplate($event)"
+        >
           Scarica il modello JSON con un episodio di esempio
         </a>
       </p>
@@ -1043,22 +1048,31 @@
           <li
             *ngFor="let event of filteredEvents()"
             [class.active]="event.id === selectedEvent()?.id"
-            role="button"
-            tabindex="0"
-            [attr.aria-pressed]="event.id === selectedEvent()?.id"
-            [attr.aria-label]="'Seleziona episodio: ' + event.locationLabel"
-            (click)="selectEvent(event.id)"
-            (keydown)="onEventItemKeydown($event, event.id)"
           >
-            <div class="event-header">
-              <strong>{{ event.locationLabel }}</strong>
-              <span>{{ labelFor(event.eventType) }}</span>
-            </div>
-            <small
-              >{{ event.room ? event.room + ' · ' : ''
-              }}{{ event.startedAt | date: 'dd MMM yyyy, HH:mm' }}</small
+            <div
+              class="event-row"
+              role="button"
+              tabindex="0"
+              [attr.aria-expanded]="event.id === selectedEvent()?.id"
+              [attr.aria-label]="'Seleziona episodio: ' + event.locationLabel"
+              (click)="selectEvent(event.id)"
+              (keydown)="onEventItemKeydown($event, event.id)"
             >
-            <p>{{ event.description || 'Nessuna descrizione inserita.' }}</p>
+              <div class="event-header">
+                <strong>{{ event.locationLabel }}</strong>
+                <span>{{ labelFor(event.eventType) }}</span>
+              </div>
+              <small
+                >{{ event.room ? event.room + ' · ' : ''
+                }}{{ event.startedAt | date: 'dd MMM yyyy, HH:mm' }}</small
+              >
+              <p>{{ event.description || 'Nessuna descrizione inserita.' }}</p>
+            </div>
+            <ng-container
+              *ngIf="event.id === selectedEvent()?.id"
+              [ngTemplateOutlet]="detailTpl"
+              [ngTemplateOutletContext]="{ $implicit: event }"
+            ></ng-container>
           </li>
         </ul>
 
@@ -1092,7 +1106,8 @@
         </ng-template>
       </section>
 
-      <aside class="panel detail-panel" *ngIf="selectedEvent() as event">
+      <ng-template #detailTpl let-event>
+      <div class="detail-panel">
         <div class="section-heading compact">
           <h2>Dettaglio</h2>
           <span class="status-badge">{{ labelFor(event.status) }}</span>
@@ -1294,7 +1309,8 @@
             </li>
           </ol>
         </details>
-      </aside>
+      </div>
+      </ng-template>
     </div>
   </main>
   </div>
