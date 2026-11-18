@@ -72,7 +72,6 @@ test.describe('Intestazione', () => {
   });
 
   test('il pulsante Nuovo episodio apre il modulo con il focus su Luogo', async ({ page }) => {
-    await page.getByRole('button', { name: 'Nascondi modulo' }).click();
     await page.getByRole('button', { name: 'Nuovo episodio' }).click();
 
     await expect(page.locator('form.event-form').getByLabel('Luogo')).toBeFocused();
@@ -81,6 +80,7 @@ test.describe('Intestazione', () => {
   test('la guida mantiene il modulo in compilazione e offre il modello importabile', async ({
     page,
   }) => {
+    await page.getByRole('button', { name: 'Nuovo episodio' }).click();
     const form = page.locator('form.event-form');
     await form.getByLabel('Luogo').fill('Luogo sintetico da conservare');
     await form.getByLabel('Descrizione').fill('Appunti sintetici non ancora salvati.');

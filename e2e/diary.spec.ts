@@ -29,12 +29,12 @@ test.describe('Diario locale', () => {
 
   test('filtra gli episodi con la ricerca', async ({ page }) => {
     await createEpisode(page, { location: 'Cucina' });
-    await expect(page.locator('.event-list li')).toHaveCount(1);
+    await expect(page.locator('.event-list > li')).toHaveCount(1);
     await createEpisode(page, { location: 'Camera da letto' });
-    await expect(page.locator('.event-list li')).toHaveCount(2);
+    await expect(page.locator('.event-list > li')).toHaveCount(2);
 
     await page.getByRole('searchbox', { name: 'Cerca evento' }).fill('camera');
-    await expect(page.locator('.event-list li')).toHaveCount(1);
-    await expect(page.locator('.event-list li')).toContainText('Camera da letto');
+    await expect(page.locator('.event-list > li')).toHaveCount(1);
+    await expect(page.locator('.event-list > li')).toContainText('Camera da letto');
   });
 });
