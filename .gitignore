@@ -46,6 +46,9 @@ __screenshots__/
 .DS_Store
 Thumbs.db
 
+# Local-only dev assets (planimetrie reali: mai committare)
+/local-dev/
+
 # Local credentials and private diary backups
 .env
 .env.*

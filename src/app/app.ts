@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { RouterLink, RouterOutlet } from '@angular/router';
+import { RouterLink, RouterOutlet, Router } from '@angular/router';
 import {
   afterNextRender,
   Component,
@@ -137,6 +137,7 @@ export class App implements OnDestroy {
   protected readonly title = signal('Diario Rumore');
   protected readonly guideOpen = signal(false);
   protected readonly authMode = signal<AuthMode>('loading');
+  private readonly router = inject(Router);
   protected readonly accountMode = signal<AccountMode>('loading');
   protected readonly accountUser = signal<AccountUser | null>(null);
   protected readonly diaryOpen = computed(
@@ -315,19 +316,34 @@ export class App implements OnDestroy {
     private readonly nativeFileService: NativeFileService,
   ) {
     effect(() => this.mapContext.events.set(this.events()));
-    this.mapContext.placeEvent = (id, x, y) => this.setEventPlan(id, x, y);
+    effect(() => {
+      const loading =
+        this.accountMode() === 'loading' || (this.accountMode() === 'local' && this.authMode() === 'loading');
+      this.mapContext.sessionState.set(loading ? 'loading' : this.diaryOpen() ? 'open' : 'closed');
+    });
+    effect(() => {
+      if (this.mapContext.sessionState() === 'closed' && this.router.url.startsWith('/mappa')) {
+        void this.router.navigateByUrl('/');
+      }
+    });
+    this.mapContext.placeEvent = (id, x, y, planId) => this.setEventPlan(id, x, y, planId);
     void this.initialize();
   }
 
-  private async setEventPlan(id: string, x: number | null, y: number | null): Promise<void> {
+  private async setEventPlan(
+    id: string,
+    x: number | null,
+    y: number | null,
+    planId?: string,
+  ): Promise<void> {
     const updatedEvents = this.events().map((item) => {
       if (item.id !== id) {
         return item;
       }
-      const { planX: _x, planY: _y, ...rest } = item;
+      const { planX: _x, planY: _y, planId: _p, ...rest } = item;
       return {
         ...rest,
-        ...(x === null || y === null ? {} : { planX: x, planY: y }),
+        ...(x === null || y === null ? {} : { planX: x, planY: y, ...(planId ? { planId } : {}) }),
         updatedAt: new Date().toISOString(),
       };
     });

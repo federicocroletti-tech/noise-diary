@@ -72,6 +72,26 @@ button:disabled {
   opacity: 0.55;
 }
 
+/* Schermate di accesso: pulsanti secondari distanziati e a capo invece di accostati o sovrapposti. */
+.auth-panel .auth-form {
+  gap: 16px;
+}
+
+.auth-panel .auth-form button {
+  min-width: 140px;
+}
+
+.auth-panel .auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.auth-panel > button {
+  margin: 16px 12px 0 0;
+}
+
 button.primary {
   background: linear-gradient(135deg, var(--primary), var(--primary-strong));
   color: #06202b;

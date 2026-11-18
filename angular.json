@@ -28,6 +28,21 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "pdf.worker.min.mjs",
+                "input": "node_modules/pdfjs-dist/build",
+                "output": "pdfjs"
+              },
+              {
+                "glob": "*.wasm",
+                "input": "node_modules/pdfjs-dist/wasm",
+                "output": "pdfjs/wasm"
+              },
+              {
+                "glob": "*",
+                "input": "node_modules/pdfjs-dist/standard_fonts",
+                "output": "pdfjs/standard_fonts"
               }
             ],
             "styles": ["src/styles.scss"]
@@ -52,7 +67,33 @@
             "development": {
               "optimization": false,
               "extractLicenses": false,
-              "sourceMap": true
+              "sourceMap":  true,
+              "assets":  [
+                             {
+                                 "glob":  "**/*",
+                                 "input":  "public"
+                             },
+                             {
+                                 "glob":  "pdf.worker.min.mjs",
+                                 "input":  "node_modules/pdfjs-dist/build",
+                                 "output":  "pdfjs"
+                             },
+                             {
+                                 "glob":  "*.wasm",
+                                 "input":  "node_modules/pdfjs-dist/wasm",
+                                 "output":  "pdfjs/wasm"
+                             },
+                             {
+                                 "glob":  "*",
+                                 "input":  "node_modules/pdfjs-dist/standard_fonts",
+                                 "output":  "pdfjs/standard_fonts"
+                             },
+                             {
+                                 "glob":  "planimetria-dev.pdf",
+                                 "input":  "local-dev",
+                                 "output":  "dev-local"
+                             }
+                         ]
             }
           },
           "defaultConfiguration": "production"

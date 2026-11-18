@@ -191,6 +191,7 @@ export class NoiseStorageService {
       microphonePosition: this.optionalString(source.microphonePosition),
       planX: this.optionalRatio(source.planX),
       planY: this.optionalRatio(source.planY),
+      planId: this.optionalString(source.planId),
       windowsState: this.optionalString(source.windowsState),
       doorsState: this.optionalString(source.doorsState),
       eventType,

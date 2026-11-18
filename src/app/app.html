@@ -22,8 +22,8 @@
       >
         {{ guideOpen() ? 'Torna all’app' : 'Guida all’uso' }}
       </a>
-      <a *ngIf="!guideOpen()" class="guide-link" routerLink="/mappa">Mappa</a>
       <ng-container *ngIf="diaryOpen() && !recoveryCode() && !guideOpen()">
+      <a class="guide-link" routerLink="/mappa">Mappa</a>
       <button
         type="button"
         [class.primary]="!showForm()"
@@ -162,7 +162,7 @@
           </label>
           <button type="submit" class="primary" [disabled]="accountBusy()">Accedi</button>
         </form>
-        <div class="actions">
+        <div class="auth-actions">
           <button type="button" class="secondary" (click)="setAccountMode('signup')">Crea account</button>
           <button type="button" class="secondary" (click)="setAccountMode('forgot-password')">
             Password dimenticata?
