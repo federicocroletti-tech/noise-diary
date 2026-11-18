@@ -35,6 +35,7 @@ test.describe('Intestazione', () => {
 
   test('mostra solo le azioni principali e il titolo su una riga', async ({ page }) => {
     const header = page.locator('header.topbar');
+    await header.getByRole('button', { name: 'Nuovo episodio' }).click();
     await expect(header.getByRole('button', { name: 'Nascondi modulo' })).toBeVisible();
     await expect(header.getByText('Backup', { exact: true })).toBeVisible();
     await expect(header.getByText('Profilo', { exact: true })).toBeVisible();

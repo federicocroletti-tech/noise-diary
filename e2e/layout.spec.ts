@@ -22,6 +22,7 @@ test.describe('Layout e stili di base', () => {
 
   test('i campi mostrano un indicatore di focus da tastiera', async ({ page }) => {
     await openLocalDiary(page);
+    await page.getByRole('button', { name: 'Nuovo episodio' }).click();
 
     const location = page.locator('form.event-form').getByLabel('Luogo');
     await location.focus();
