@@ -13,6 +13,7 @@ import {
 import { MapContext } from './floor-map/map-context.service';
 import { AudioClip, AudioClipKind } from './audio/models/audio-clip.model';
 import { AudioClipRepository } from './audio/audio-clip.repository';
+import { decodeAudioBlob, summarizeSpectrum } from './audio/audio-analysis';
 import {
   AudioRecordingService,
   formatRecordingError,
@@ -21,6 +22,7 @@ import {
 import { LocalVaultService } from './services/local-vault.service';
 import { NoiseStorageService } from './services/noise-storage.service';
 import {
+  AudioAnalysis,
   CONTINUITY_TYPES,
   EVENT_STATUSES,
   NoiseEvent,
@@ -1468,6 +1470,46 @@ export class App implements OnDestroy {
       this.audioStatus.set('Registrazione eliminata dal dispositivo.');
     } catch (error) {
       this.audioError.set(formatRecordingError(error));
+    }
+  }
+
+  protected isAnalysisCurrent(event: NoiseEvent, clip: AudioClip): boolean {
+    return event.audioAnalysis?.clipId === clip.id && event.audioAnalysis.sha256 === clip.sha256;
+  }
+
+  protected hasCurrentAnalysis(event: NoiseEvent): boolean {
+    return this.audioClips().some((clip) => this.isAnalysisCurrent(event, clip));
+  }
+
+  protected async analyzeAudioClip(clip: AudioClip): Promise<void> {
+    this.audioError.set('');
+    this.audioStatus.set('Analisi frequenze in corso…');
+    try {
+      const decoded = await decodeAudioBlob(clip.blob);
+      const summary = summarizeSpectrum(decoded.samples, decoded.sampleRate);
+      const analysis: AudioAnalysis = {
+        clipId: clip.id,
+        sha256: clip.sha256,
+        createdAt: new Date().toISOString(),
+        sampleRate: decoded.sampleRate,
+        dominantFrequencies: summary.dominantFrequencies,
+        bands: summary.bands,
+      };
+      const updatedEvents = this.events().map((item) =>
+        item.id === clip.eventId
+          ? { ...item, audioAnalysis: analysis, updatedAt: analysis.createdAt }
+          : item,
+      );
+      await this.saveEventsForActiveDiary(updatedEvents);
+      this.events.set(updatedEvents);
+      this.audioStatus.set('Analisi frequenze completata.');
+    } catch (error) {
+      this.audioStatus.set('');
+      this.audioError.set(
+        error instanceof Error && error.message
+          ? `Analisi non riuscita: ${error.message}`
+          : 'Analisi non riuscita: il file audio non è leggibile.',
+      );
     }
   }
 

@@ -1255,6 +1255,14 @@
                 <button type="button" class="secondary" (click)="downloadAudioClip(clip)">
                   Scarica copia
                 </button>
+                <button
+                  *ngIf="clip.kind === 'event' && !isAnalysisCurrent(event, clip)"
+                  type="button"
+                  class="secondary"
+                  (click)="analyzeAudioClip(clip)"
+                >
+                  Calcola frequenze
+                </button>
                 <button type="button" class="danger" (click)="deleteAudioClip(clip)">Elimina</button>
               </div>
             </li>
@@ -1286,9 +1294,30 @@
 
         <div class="chart-panel">
           <h4>Analisi frequenze (informativa)</h4>
-          <p class="empty-state">
-            Analisi non disponibile: nessun dato è stato calcolato per questo episodio.
-          </p>
+          <ng-container *ngIf="hasCurrentAnalysis(event) && event.audioAnalysis as analysis; else noAnalysis">
+            <p class="audio-meta">
+              Calcolata sul dispositivo il {{ analysis.createdAt | date: 'dd MMM yyyy, HH:mm' }} ·
+              {{ analysis.sampleRate }} Hz
+            </p>
+            <h5>Frequenze dominanti</h5>
+            <ul *ngIf="analysis.dominantFrequencies.length; else noPeaks">
+              <li *ngFor="let hz of analysis.dominantFrequencies">{{ hz }} Hz</li>
+            </ul>
+            <ng-template #noPeaks>
+              <p>Nessun picco dominante rilevato.</p>
+            </ng-template>
+            <h5>Ampiezza per banda (relativa al valore massimo)</h5>
+            <ul>
+              <li *ngFor="let band of analysis.bands">
+                {{ band.label }}: {{ band.amplitude * 100 | number: '1.0-0' }}%
+              </li>
+            </ul>
+          </ng-container>
+          <ng-template #noAnalysis>
+            <p class="empty-state">
+              Analisi non disponibile: usa «Calcola frequenze» su una registrazione dell'episodio.
+            </p>
+          </ng-template>
         </div>
 
         <div class="notes-block">
