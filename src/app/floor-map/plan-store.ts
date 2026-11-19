@@ -1,5 +1,13 @@
 export type RoomKind = 'apartment' | 'cellar' | 'attic' | 'garage' | 'other';
 
+/** Rettangolo del locale sulla pagina intera, in frazioni (0–1) di larghezza e altezza. */
+export interface PlanCrop {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface PlanRoom {
   id: string;
   kind: RoomKind;
@@ -7,6 +15,7 @@ export interface PlanRoom {
   image: Blob;
   width: number;
   height: number;
+  crop?: PlanCrop;
 }
 
 export interface StoredPlan {
