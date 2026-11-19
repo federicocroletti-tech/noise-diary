@@ -1122,6 +1122,16 @@
           <p>{{ event.description }}</p>
         </div>
 
+        <aside class="action-card" aria-labelledby="action-card-heading">
+          <h4 id="action-card-heading">Possibile prossima azione</h4>
+          <strong>{{ actionSuggestionFor(event).title }}</strong>
+          <p>{{ actionSuggestionFor(event).summary }}</p>
+          <ol>
+            <li *ngFor="let step of actionSuggestionFor(event).steps">{{ step }}</li>
+          </ol>
+          <p class="action-card-disclaimer">{{ actionDisclaimer }}</p>
+        </aside>
+
         <div class="actions detail-actions">
           <button
             type="button"

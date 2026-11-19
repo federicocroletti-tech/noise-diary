@@ -36,6 +36,11 @@ import { AccountUser, NeonAuthService } from './services/neon-auth.service';
 import { NeonAudioRepository } from './services/neon-audio.repository';
 import { NeonDiaryService } from './services/neon-diary.service';
 import { NativeFileService } from './services/native-file.service';
+import {
+  NOISE_ACTION_DISCLAIMER,
+  NoiseActionSuggestion,
+  suggestNoiseAction,
+} from './domain/noise-action-suggestions';
 
 type SortMode = 'recent' | 'intensity' | 'room';
 type DiaryView = 'list' | 'form' | 'detail';
@@ -1205,6 +1210,12 @@ export class App implements OnDestroy {
   protected labelFor(value: string): string {
     return this.choiceLabels[value] ?? value;
   }
+
+  protected actionSuggestionFor(event: NoiseEvent): NoiseActionSuggestion {
+    return suggestNoiseAction(event.eventType);
+  }
+
+  protected readonly actionDisclaimer = NOISE_ACTION_DISCLAIMER;
 
   protected onEventItemKeydown(event: KeyboardEvent, eventId: string): void {
     if (event.key === 'Enter' || event.key === ' ') {
