@@ -1,5 +1,5 @@
 import type { TextItem } from 'pdfjs-dist/types/src/display/api';
-import { PlanRoom, RoomKind } from './plan-store';
+import { PlanCrop, PlanRoom, RoomKind } from './plan-store';
 
 const RENDER_SCALE = 4;
 const KIND_LABEL: Record<RoomKind, string> = {
@@ -120,11 +120,25 @@ export function findInkBands(canvas: HTMLCanvasElement, tokens: string[]) {
   }));
 }
 
+// Il primo passaggio è quello per gli appartamenti; il secondo recupera le cantine, con pochi segmenti tratteggiati.
+const UNIT_PASSES = [
+  { denseRatio: 0.7, minGroup: 8 },
+  { denseRatio: 0.5, minGroup: 4 },
+];
+
 /**
  * Nelle planimetrie catastali l'unità in esame ha le pareti tratteggiate, i vicini solo contorni sottili.
  * Ritaglia sul riquadro dei segmenti tratteggiati; se non è significativo restituisce l'immagine intera.
  */
 export function isolateUnit(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  for (const pass of UNIT_PASSES) {
+    const unit = findUnit(canvas, pass.denseRatio, pass.minGroup);
+    if (unit) return unit;
+  }
+  return canvas;
+}
+
+function findUnit(canvas: HTMLCanvasElement, denseRatio: number, minGroup: number): HTMLCanvasElement | null {
   const cell = 16;
   const { width, height } = canvas;
   const cols = Math.ceil(width / cell);
@@ -147,7 +161,7 @@ export function isolateUnit(canvas: HTMLCanvasElement): HTMLCanvasElement {
           if (ink(x, y) && (y === cy * cell || !ink(x, y - 1))) colRuns++;
         }
       }
-      dense[cy * cols + cx] = Math.min(rowRuns / (y1 - cy * cell), colRuns / (x1 - cx * cell)) >= 0.7 ? 1 : 0;
+      dense[cy * cols + cx] = Math.min(rowRuns / (y1 - cy * cell), colRuns / (x1 - cx * cell)) >= denseRatio ? 1 : 0;
     }
   }
   const seen = new Uint8Array(cols * rows);
@@ -177,7 +191,7 @@ export function isolateUnit(canvas: HTMLCanvasElement): HTMLCanvasElement {
       }
     }
     // Le pareti tratteggiate sono segmenti separati: il riquadro dell'unità è l'unione dei segmenti significativi.
-    if (group.size >= 8) {
+    if (group.size >= minGroup) {
       best = {
         size: best.size + group.size,
         minX: best.size ? Math.min(best.minX, group.minX) : group.minX,
@@ -189,7 +203,7 @@ export function isolateUnit(canvas: HTMLCanvasElement): HTMLCanvasElement {
   }
   const w = (best.maxX - best.minX + 1) * cell;
   const h = (best.maxY - best.minY + 1) * cell;
-  if (best.size < 12 || w < width * 0.2 || h < height * 0.2) return canvas;
+  if (best.size < 12 || w < width * 0.2 || h < height * 0.2) return null;
   const margin = cell * 3;
   const x0 = Math.max(0, best.minX * cell - margin);
   const y0 = Math.max(0, best.minY * cell - margin);
@@ -233,7 +247,15 @@ const toBlob = (canvas: HTMLCanvasElement) =>
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Rendering planimetria fallito.'))), 'image/png'),
   );
 
-export async function analyzePlanPdf(file: Blob): Promise<PlanRoom[]> {
+/** Rettangolo tra due punti trascinati (frazioni 0–1), indipendentemente dal verso del trascinamento. */
+export function rectBetween(a: { x: number; y: number }, b: { x: number; y: number }): PlanCrop {
+  const clamp = (value: number) => Math.min(1, Math.max(0, value));
+  const x0 = clamp(Math.min(a.x, b.x));
+  const y0 = clamp(Math.min(a.y, b.y));
+  return { x: x0, y: y0, w: clamp(Math.max(a.x, b.x)) - x0, h: clamp(Math.max(a.y, b.y)) - y0 };
+}
+
+async function renderPage(file: Blob, scale: number) {
   const pdfjs = await import('pdfjs-dist');
   pdfjs.GlobalWorkerOptions.workerSrc = 'pdfjs/pdf.worker.min.mjs';
   const document_ = await pdfjs.getDocument({
@@ -242,7 +264,7 @@ export async function analyzePlanPdf(file: Blob): Promise<PlanRoom[]> {
     standardFontDataUrl: 'pdfjs/standard_fonts/',
   }).promise;
   const page = await document_.getPage(1);
-  const viewport = page.getViewport({ scale: RENDER_SCALE });
+  const viewport = page.getViewport({ scale });
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(viewport.width);
   canvas.height = Math.round(viewport.height);
@@ -250,6 +272,31 @@ export async function analyzePlanPdf(file: Blob): Promise<PlanRoom[]> {
   context.fillStyle = '#fff';
   context.fillRect(0, 0, canvas.width, canvas.height);
   await page.render({ canvas, canvasContext: context, viewport }).promise;
+  return { page, viewport, canvas };
+}
+
+/** Pagina intera della planimetria, per la selezione manuale del locale. */
+export async function renderPlanPage(file: Blob, scale = 1.5): Promise<HTMLCanvasElement> {
+  return (await renderPage(file, scale)).canvas;
+}
+
+/** Ritaglia il locale dalla pagina ad alta risoluzione, senza la correzione automatica. */
+export async function cropPlanRoom(file: Blob, crop: PlanCrop): Promise<Pick<PlanRoom, 'image' | 'width' | 'height'>> {
+  const canvas = await renderPlanPage(file, RENDER_SCALE);
+  const x0 = Math.round(crop.x * canvas.width);
+  const y0 = Math.round(crop.y * canvas.height);
+  const w = Math.round(crop.w * canvas.width);
+  const h = Math.round(crop.h * canvas.height);
+  const out = document.createElement('canvas');
+  out.width = w;
+  out.height = h;
+  out.getContext('2d')!.drawImage(canvas, x0, y0, w, h, 0, 0, w, h);
+  const trimmed = trimWhitespace(out, 40);
+  return { image: await toBlob(trimmed), width: trimmed.width, height: trimmed.height };
+}
+
+export async function analyzePlanPdf(file: Blob): Promise<PlanRoom[]> {
+  const { page, viewport, canvas } = await renderPage(file, RENDER_SCALE);
 
   const content = await page.getTextContent();
   const items = content.items
@@ -285,6 +332,7 @@ export async function analyzePlanPdf(file: Blob): Promise<PlanRoom[]> {
       image: await toBlob(trimmed),
       width: trimmed.width,
       height: trimmed.height,
+      crop: { x: x0 / canvas.width, y: y0 / canvas.height, w: w / canvas.width, h: h / canvas.height },
     });
   }
   if (!rooms.length) {

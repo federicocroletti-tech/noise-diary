@@ -3,15 +3,16 @@ import { Component, computed, effect, inject, isDevMode, signal } from '@angular
 import { FormsModule } from '@angular/forms';
 import { NoiseEvent } from '../domain/noise-event.model';
 import { MapContext } from './map-context.service';
-import { analyzePlanPdf } from './plan-analyzer';
-import { PlanRoom, PlanStore } from './plan-store';
+import { PlanCropper } from './plan-cropper';
+import { analyzePlanPdf, cropPlanRoom } from './plan-analyzer';
+import { PlanCrop, PlanRoom, PlanStore } from './plan-store';
 
 const GEO_KEY = 'noise-diary.map-georef';
 const DEV_PLAN_URL = 'dev-local/planimetria-dev.pdf';
 
 @Component({
   selector: 'app-floor-map',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, PlanCropper],
   template: `
     <section class="panel map-page">
       <div class="map-toolbar">
@@ -26,6 +27,7 @@ const DEV_PLAN_URL = 'dev-local/planimetria-dev.pdf';
           {{ rooms().length ? 'Cambia PDF' : 'Carica planimetria (PDF)' }}
           <input type="file" accept="application/pdf" hidden (change)="onPlanFile($event)" />
         </label>
+        <button *ngIf="rooms().length" type="button" class="secondary" (click)="startCrop()">Ritaglia locale</button>
         <button *ngIf="rooms().length" type="button" class="danger" (click)="removePlan()">Rimuovi</button>
       </div>
 
@@ -35,6 +37,14 @@ const DEV_PLAN_URL = 'dev-local/planimetria-dev.pdf';
         Carica il PDF della planimetria (un file per volta, resta solo su questo dispositivo): riconosco appartamento,
         cantina, solaio e box e li mostro uno alla volta.
       </p>
+
+      <app-plan-cropper
+        *ngIf="cropPdf() as pdf"
+        [pdf]="pdf"
+        [initial]="room()?.crop ?? null"
+        (confirm)="saveCrop($event)"
+        (cancel)="cropPdf.set(null)"
+      />
 
       <div class="filters" *ngIf="rooms().length">
         <label>Dal <input type="date" [ngModel]="dateFrom()" (ngModelChange)="dateFrom.set($event)" /></label>
@@ -49,7 +59,8 @@ const DEV_PLAN_URL = 'dev-local/planimetria-dev.pdf';
       </div>
       <p class="hint" *ngIf="placingId()">Clicca sulla planimetria per indicare da dove hai sentito il rumore.</p>
 
-      <div class="map-layout" *ngIf="room() as current">
+      <div class="map-layout" *ngIf="room() as current" [style.display]="cropPdf() ? 'none' : null">
+
         <div class="plan" [class.placing]="placingId()" (click)="onPlanClick($event)">
           <img [src]="imageUrl()" [alt]="'Planimetria: ' + current.label" draggable="false" />
           <ng-container *ngIf="geoEnabled()">
@@ -125,6 +136,7 @@ export class FloorMap {
   protected readonly dateFrom = signal('');
   protected readonly dateTo = signal('');
   protected readonly geoEnabled = signal(localStorage.getItem(GEO_KEY) === '1');
+  protected readonly cropPdf = signal<Blob | null>(null);
 
   protected readonly room = computed(() => this.rooms().find((room) => room.id === this.roomId()) ?? null);
   protected readonly visible = computed(() => {
@@ -246,5 +258,34 @@ export class FloorMap {
   protected async removePlan(): Promise<void> {
     await PlanStore.clear();
     this.setRooms([]);
+  }
+
+  protected async startCrop(): Promise<void> {
+    const stored = await PlanStore.load();
+    if (stored) {
+      this.cropPdf.set(stored.pdf);
+    }
+  }
+
+  // Il ritaglio manuale sostituisce l'immagine del locale, usando la pagina originale salvata sul dispositivo.
+  protected async saveCrop(crop: PlanCrop): Promise<void> {
+    const id = this.roomId();
+    const stored = await PlanStore.load();
+    this.cropPdf.set(null);
+    if (!stored) {
+      return;
+    }
+    this.busy.set(true);
+    this.error.set('');
+    try {
+      const cropped = await cropPlanRoom(stored.pdf, crop);
+      const rooms = stored.rooms.map((room) => (room.id === id ? { ...room, crop, ...cropped } : room));
+      await PlanStore.save({ ...stored, rooms });
+      this.rooms.set(rooms);
+    } catch {
+      this.error.set('Non riesco a ritagliare il locale da questa planimetria.');
+    } finally {
+      this.busy.set(false);
+    }
   }
 }
