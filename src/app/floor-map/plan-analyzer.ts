@@ -120,11 +120,25 @@ export function findInkBands(canvas: HTMLCanvasElement, tokens: string[]) {
   }));
 }
 
+// Il primo passaggio è quello per gli appartamenti; il secondo recupera le cantine, con pochi segmenti tratteggiati.
+const UNIT_PASSES = [
+  { denseRatio: 0.7, minGroup: 8 },
+  { denseRatio: 0.5, minGroup: 4 },
+];
+
 /**
  * Nelle planimetrie catastali l'unità in esame ha le pareti tratteggiate, i vicini solo contorni sottili.
  * Ritaglia sul riquadro dei segmenti tratteggiati; se non è significativo restituisce l'immagine intera.
  */
 export function isolateUnit(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  for (const pass of UNIT_PASSES) {
+    const unit = findUnit(canvas, pass.denseRatio, pass.minGroup);
+    if (unit) return unit;
+  }
+  return canvas;
+}
+
+function findUnit(canvas: HTMLCanvasElement, denseRatio: number, minGroup: number): HTMLCanvasElement | null {
   const cell = 16;
   const { width, height } = canvas;
   const cols = Math.ceil(width / cell);
@@ -147,7 +161,7 @@ export function isolateUnit(canvas: HTMLCanvasElement): HTMLCanvasElement {
           if (ink(x, y) && (y === cy * cell || !ink(x, y - 1))) colRuns++;
         }
       }
-      dense[cy * cols + cx] = Math.min(rowRuns / (y1 - cy * cell), colRuns / (x1 - cx * cell)) >= 0.7 ? 1 : 0;
+      dense[cy * cols + cx] = Math.min(rowRuns / (y1 - cy * cell), colRuns / (x1 - cx * cell)) >= denseRatio ? 1 : 0;
     }
   }
   const seen = new Uint8Array(cols * rows);
@@ -177,7 +191,7 @@ export function isolateUnit(canvas: HTMLCanvasElement): HTMLCanvasElement {
       }
     }
     // Le pareti tratteggiate sono segmenti separati: il riquadro dell'unità è l'unione dei segmenti significativi.
-    if (group.size >= 8) {
+    if (group.size >= minGroup) {
       best = {
         size: best.size + group.size,
         minX: best.size ? Math.min(best.minX, group.minX) : group.minX,
@@ -189,7 +203,7 @@ export function isolateUnit(canvas: HTMLCanvasElement): HTMLCanvasElement {
   }
   const w = (best.maxX - best.minX + 1) * cell;
   const h = (best.maxY - best.minY + 1) * cell;
-  if (best.size < 12 || w < width * 0.2 || h < height * 0.2) return canvas;
+  if (best.size < 12 || w < width * 0.2 || h < height * 0.2) return null;
   const margin = cell * 3;
   const x0 = Math.max(0, best.minX * cell - margin);
   const y0 = Math.max(0, best.minY * cell - margin);
