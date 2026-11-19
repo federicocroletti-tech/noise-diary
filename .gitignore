@@ -56,3 +56,6 @@ Thumbs.db
 !.env.*.example
 /backup/
 *.ndbackup
+
+# Bozze di strategia di promozione (non pubblicare)
+/social/
