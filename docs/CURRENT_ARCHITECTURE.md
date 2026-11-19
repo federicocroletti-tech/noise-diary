@@ -86,7 +86,7 @@ Campi opzionali includono durata, fine calcolata, finestre/porta/posizione micro
 
 ## Audio e hash
 
-La registrazione usa `getUserMedia` e `MediaRecorder`, solo dopo click e permesso. Il limite è 300 secondi o 50 MiB; il tipo MIME è scelto tra i candidati supportati dal browser. SHA-256 è calcolato sul blob acquisito e salvato nei metadati. I download cloud sono verificati rispetto all'hash prima di essere mostrati. L'hash non attesta autore, origine, momento o autenticità.
+La registrazione usa `getUserMedia` e `MediaRecorder`, solo dopo click e permesso. Il limite è 300 secondi o 50 MiB; il tipo MIME è scelto tra i candidati supportati dal browser. In alternativa, un file audio già esistente può essere allegato all’episodio (MP3, M4A, WAV, OGG, WebM, FLAC; 50 MiB): in quel caso `origin` è `file` e durata, tipo e hash derivano dal file scelto, senza verificarne origine o data. SHA-256 è calcolato sul blob acquisito o allegato e salvato nei metadati. I download cloud sono verificati rispetto all'hash prima di essere mostrati. L'hash non attesta autore, origine, momento o autenticità.
 
 ## Import, export e UI
 

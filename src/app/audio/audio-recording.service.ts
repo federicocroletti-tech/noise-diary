@@ -5,6 +5,17 @@ import { AudioClipRepository } from './audio-clip.repository';
 export const MAX_RECORDING_DURATION_SECONDS = 300;
 export const MAX_RECORDING_SIZE_BYTES = 50 * 1024 * 1024;
 const MIME_TYPE_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+const IMPORT_MIME_TYPE_BY_EXTENSION: Record<string, string> = {
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  aac: 'audio/aac',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  oga: 'audio/ogg',
+  opus: 'audio/ogg',
+  webm: 'audio/webm',
+  flac: 'audio/flac',
+};
 
 export function chooseSupportedAudioMimeType(isSupported: (mimeType: string) => boolean): string | undefined {
   return MIME_TYPE_CANDIDATES.find(isSupported);
@@ -13,6 +24,81 @@ export function chooseSupportedAudioMimeType(isSupported: (mimeType: string) => 
 export async function calculateSha256(blob: Blob, subtleCrypto: SubtleCrypto = crypto.subtle): Promise<string> {
   const digest = await subtleCrypto.digest('SHA-256', await blob.arrayBuffer());
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export function resolveImportedAudioMimeType(file: Pick<File, 'name' | 'type'>): string | undefined {
+  if (file.type.startsWith('audio/')) {
+    return file.type;
+  }
+  const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+  return IMPORT_MIME_TYPE_BY_EXTENSION[extension];
+}
+
+export function readAudioDurationMs(blob: Blob): Promise<number> {
+  const url = URL.createObjectURL(blob);
+  return new Promise<number>((resolve, reject) => {
+    const audio = new Audio();
+    const cleanup = () => {
+      URL.revokeObjectURL(url);
+      audio.removeAttribute('src');
+      audio.load();
+    };
+    audio.preload = 'metadata';
+    audio.onloadedmetadata = () => {
+      // Some containers report an infinite duration until fully scanned; store 0 rather than an invalid value.
+      const durationMs = Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) : 0;
+      cleanup();
+      resolve(durationMs);
+    };
+    audio.onerror = () => {
+      cleanup();
+      reject(new Error('Impossibile leggere il file audio selezionato. Verifica che sia un file audio valido.'));
+    };
+    audio.src = url;
+  });
+}
+
+export async function createAudioClipFromFile(
+  file: File,
+  options: {
+    eventId: string;
+    kind: AudioClipKind;
+    readDurationMs?: (blob: Blob) => Promise<number>;
+  },
+): Promise<AudioClip> {
+  const mimeType = resolveImportedAudioMimeType(file);
+  if (!mimeType) {
+    throw new Error('Formato non supportato: scegli un file audio come MP3, M4A, WAV, OGG, WebM o FLAC.');
+  }
+  if (file.size === 0) {
+    throw new Error('Il file audio è vuoto e non può essere allegato.');
+  }
+  if (file.size > MAX_RECORDING_SIZE_BYTES) {
+    throw new Error('Il file supera il limite di 50 MB e non è stato allegato.');
+  }
+  if (!globalThis.crypto?.subtle) {
+    throw new Error('Web Crypto non è disponibile: impossibile verificare l’integrità del file.');
+  }
+
+  const durationMs = await (options.readDurationMs ?? readAudioDurationMs)(file);
+  const sha256 = await calculateSha256(file);
+  const createdAt = new Date(file.lastModified > 0 ? file.lastModified : Date.now()).toISOString();
+  return {
+    id: crypto.randomUUID(),
+    eventId: options.eventId,
+    kind: options.kind,
+    blob: file,
+    fileName: file.name,
+    mimeType,
+    sizeBytes: file.size,
+    durationMs,
+    createdAt,
+    sha256,
+    origin: 'file',
+    device: {
+      platform: '',
+    },
+  };
 }
 
 export function formatRecordingError(error: unknown): string {
@@ -60,6 +146,10 @@ export class AudioRecordingService {
 
   get isRecording(): boolean {
     return this.recorder?.state === 'recording';
+  }
+
+  async saveAttachedClip(clip: AudioClip): Promise<void> {
+    await this.saveClip(clip);
   }
 
   get isPaused(): boolean {

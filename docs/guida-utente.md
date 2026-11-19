@@ -84,6 +84,8 @@ Seleziona un episodio per aprire il dettaglio. Con **Modifica episodio** puoi co
 
 Il limite per registrazione è di **5 minuti o 50 MB**. Ferma e salva prima di cambiare episodio, aprire la guida o uscire. Per registrare servono un browser compatibile, un microfono e una pagina HTTPS (oppure localhost durante lo sviluppo).
 
+Se hai già un audio registrato con un altro strumento, premi **Allega file audio** nella stessa sezione e scegli il file (MP3, M4A, WAV, OGG, WebM o FLAC, fino a 50 MB). Il file viene conservato come le registrazioni del microfono, con tipo, durata e SHA-256 calcolati dal file scelto. Il file originale non viene modificato, ma l’app non può verificare dove o quando sia stato registrato.
+
 Puoi riascoltare l’audio, usare **Scarica copia** o eliminarlo. Nell’account l’audio è caricato nel cloud; nel diario locale resta cifrato nel browser. Evita conversazioni e persone non necessarie. Le registrazioni non sono misurazioni fonometriche professionali; l’analisi delle frequenze non è attualmente disponibile.
 
 ## Backup e importazione

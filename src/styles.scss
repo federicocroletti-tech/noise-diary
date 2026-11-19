@@ -282,3 +282,30 @@ textarea:focus-visible {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* Scheda "possibile prossima azione" (qui per restare nel budget di stile del componente App). */
+.action-card {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.action-card h4 {
+  margin: 0 0 6px;
+}
+
+.action-card ol {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.action-card-disclaimer {
+  margin: 12px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}

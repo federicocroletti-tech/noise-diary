@@ -15,6 +15,7 @@ import { AudioClip, AudioClipKind } from './audio/models/audio-clip.model';
 import { AudioClipRepository } from './audio/audio-clip.repository';
 import {
   AudioRecordingService,
+  createAudioClipFromFile,
   formatRecordingError,
   MAX_RECORDING_DURATION_SECONDS,
 } from './audio/audio-recording.service';
@@ -36,6 +37,11 @@ import { AccountUser, NeonAuthService } from './services/neon-auth.service';
 import { NeonAudioRepository } from './services/neon-audio.repository';
 import { NeonDiaryService } from './services/neon-diary.service';
 import { NativeFileService } from './services/native-file.service';
+import {
+  NOISE_ACTION_DISCLAIMER,
+  NoiseActionSuggestion,
+  suggestNoiseAction,
+} from './domain/noise-action-suggestions';
 
 type SortMode = 'recent' | 'intensity' | 'room';
 type DiaryView = 'list' | 'form' | 'detail';
@@ -131,13 +137,13 @@ const EMPTY_DRAFT: NoiseEventDraft = {
 export class App implements OnDestroy {
   private readonly injector = inject(Injector);
   private readonly mapContext = inject(MapContext);
+  private readonly router = inject(Router);
   private diaryRevision = 0;
   private audioRequestId = 0;
 
   protected readonly title = signal('Diario Rumore');
   protected readonly guideOpen = signal(false);
   protected readonly authMode = signal<AuthMode>('loading');
-  private readonly router = inject(Router);
   protected readonly accountMode = signal<AccountMode>('loading');
   protected readonly accountUser = signal<AccountUser | null>(null);
   protected readonly diaryOpen = computed(
@@ -1206,6 +1212,12 @@ export class App implements OnDestroy {
     return this.choiceLabels[value] ?? value;
   }
 
+  protected actionSuggestionFor(event: NoiseEvent): NoiseActionSuggestion {
+    return suggestNoiseAction(event.eventType);
+  }
+
+  protected readonly actionDisclaimer = NOISE_ACTION_DISCLAIMER;
+
   protected onEventItemKeydown(event: KeyboardEvent, eventId: string): void {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -1466,6 +1478,44 @@ export class App implements OnDestroy {
       this.revokeAudioUrl(clip.id);
       this.audioClips.update((clips) => clips.filter((item) => item.id !== clip.id));
       this.audioStatus.set('Registrazione eliminata dal dispositivo.');
+    } catch (error) {
+      this.audioError.set(formatRecordingError(error));
+    }
+  }
+
+  protected async attachAudioFile(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) {
+      return;
+    }
+
+    const selected = this.selectedEvent();
+    if (!selected) {
+      this.audioError.set('Salva o seleziona un episodio prima di allegare un audio.');
+      return;
+    }
+    if (this.recordingActive()) {
+      this.audioError.set('Ferma la registrazione prima di allegare un file audio.');
+      return;
+    }
+
+    this.audioError.set('');
+    this.audioStatus.set('');
+    try {
+      const clip = await createAudioClipFromFile(file, {
+        eventId: selected.id,
+        kind: this.recordingKind(),
+      });
+      await this.audioRecordingService.saveAttachedClip(clip);
+      await this.addClipToEvent(clip);
+      await this.loadAudioForEvent(clip.eventId);
+      this.audioStatus.set(
+        this.accountMode() === 'signed-in'
+          ? 'File audio caricato e associato al tuo account.'
+          : 'File audio salvato solo su questo dispositivo.',
+      );
     } catch (error) {
       this.audioError.set(formatRecordingError(error));
     }
