@@ -20,6 +20,24 @@ test.describe('Layout e stili di base', () => {
     expect(page_.htmlBackground).not.toBe('rgb(255, 255, 255)');
   });
 
+  test('il tema chiaro si attiva dal pulsante e viene ricordato al ricaricamento', async ({
+    page,
+  }) => {
+    await openLocalDiary(page);
+    await page.getByRole('button', { name: 'Tema chiaro' }).click();
+
+    const html = page.locator('html');
+    await expect(html).toHaveAttribute('data-theme', 'light');
+    await expect(page.getByRole('button', { name: 'Tema scuro' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(await html.evaluate((element) => getComputedStyle(element).colorScheme)).toBe('light');
+
+    await page.reload();
+    await expect(html).toHaveAttribute('data-theme', 'light');
+  });
+
   test('i campi mostrano un indicatore di focus da tastiera', async ({ page }) => {
     await openLocalDiary(page);
     await page.getByRole('button', { name: 'Nuovo episodio' }).click();

@@ -22,6 +22,9 @@
       >
         {{ guideOpen() ? 'Torna all’app' : 'Guida all’uso' }}
       </a>
+      <button type="button" class="secondary theme-toggle" (click)="toggleTheme()" [attr.aria-pressed]="theme() === 'light'">
+        {{ theme() === 'light' ? 'Tema scuro' : 'Tema chiaro' }}
+      </button>
       <ng-container *ngIf="diaryOpen() && !recoveryCode() && !guideOpen()">
       <a class="guide-link" routerLink="/mappa">Mappa</a>
       <button
