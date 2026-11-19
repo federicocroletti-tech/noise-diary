@@ -39,6 +39,8 @@ import { NativeFileService } from './services/native-file.service';
 
 type SortMode = 'recent' | 'intensity' | 'room';
 type DiaryView = 'list' | 'form' | 'detail';
+type AppTheme = 'dark' | 'light';
+const THEME_STORAGE_KEY = 'noise-diary-theme';
 type ImportChoice = 'keep-current' | 'use-file';
 type AuthMode = 'loading' | 'profiles' | 'setup' | 'locked' | 'unavailable' | 'unlocked';
 type AccountMode =
@@ -167,6 +169,7 @@ export class App implements OnDestroy {
   protected readonly authBusy = signal(false);
   protected readonly deletingDiary = signal(false);
   protected readonly showForm = signal(false);
+  protected readonly theme = signal<AppTheme>(this.readStoredTheme());
   protected readonly activeView = signal<DiaryView>('list');
   protected readonly editingEventId = signal<string | null>(null);
   protected readonly correctionReason = signal('');
@@ -317,6 +320,11 @@ export class App implements OnDestroy {
   ) {
     effect(() => this.mapContext.events.set(this.events()));
     effect(() => {
+      const theme = this.theme();
+      document.documentElement.dataset['theme'] = theme;
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    });
+    effect(() => {
       const loading =
         this.accountMode() === 'loading' || (this.accountMode() === 'local' && this.authMode() === 'loading');
       this.mapContext.sessionState.set(loading ? 'loading' : this.diaryOpen() ? 'open' : 'closed');
@@ -328,6 +336,14 @@ export class App implements OnDestroy {
     });
     this.mapContext.placeEvent = (id, x, y, planId) => this.setEventPlan(id, x, y, planId);
     void this.initialize();
+  }
+
+  protected toggleTheme(): void {
+    this.theme.update((theme) => (theme === 'dark' ? 'light' : 'dark'));
+  }
+
+  private readStoredTheme(): AppTheme {
+    return localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark';
   }
 
   private async setEventPlan(
