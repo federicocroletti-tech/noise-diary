@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import {
   CONTINUITY_TYPES,
   EVENT_STATUSES,
+  isAudioAnalysis,
   isNoiseEvent,
   NOISE_EVENT_TYPES,
   NoiseEvent,
@@ -215,6 +216,7 @@ export class NoiseStorageService {
         : [],
       backgroundRecordingId: this.optionalString(source.backgroundRecordingId),
       deletedAt: this.optionalString(source.deletedAt),
+      audioAnalysis: isAudioAnalysis(source.audioAnalysis) ? source.audioAnalysis : undefined,
     };
     this.validateEvent(normalized);
     return normalized;
@@ -275,6 +277,9 @@ export class NoiseStorageService {
   private validateEvent(event: NoiseEvent): void {
     if (!event.id || !Number.isFinite(Date.parse(event.startedAt))) {
       throw new Error('Ogni episodio deve avere un ID e una data di inizio valida.');
+    }
+    if (event.audioAnalysis !== undefined && !isAudioAnalysis(event.audioAnalysis)) {
+      throw new Error('L’analisi delle frequenze dell’episodio non è valida.');
     }
     if (
       event.perceivedIntensity !== null &&

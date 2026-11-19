@@ -64,13 +64,41 @@ export interface BackgroundRecording {
 }
 
 export interface AudioAnalysis {
-  id: string;
-  eventId: string;
+  clipId: string;
+  sha256: string;
   createdAt: string;
   sampleRate: number;
   dominantFrequencies: number[];
   bands: FrequencyBand[];
-  notes: string;
+}
+
+export function isAudioAnalysis(value: unknown): value is AudioAnalysis {
+  if (value === null || typeof value !== 'object') {
+    return false;
+  }
+  const analysis = value as Record<string, unknown>;
+  return (
+    typeof analysis['clipId'] === 'string' &&
+    analysis['clipId'].length > 0 &&
+    typeof analysis['sha256'] === 'string' &&
+    /^[a-f0-9]{64}$/i.test(analysis['sha256']) &&
+    typeof analysis['createdAt'] === 'string' &&
+    Number.isFinite(Date.parse(analysis['createdAt'])) &&
+    typeof analysis['sampleRate'] === 'number' &&
+    Number.isFinite(analysis['sampleRate']) &&
+    analysis['sampleRate'] > 0 &&
+    Array.isArray(analysis['dominantFrequencies']) &&
+    analysis['dominantFrequencies'].every((hz) => typeof hz === 'number' && Number.isFinite(hz) && hz >= 0) &&
+    Array.isArray(analysis['bands']) &&
+    analysis['bands'].every(
+      (band) =>
+        band !== null &&
+        typeof band === 'object' &&
+        typeof (band as FrequencyBand).label === 'string' &&
+        typeof (band as FrequencyBand).amplitude === 'number' &&
+        Number.isFinite((band as FrequencyBand).amplitude),
+    )
+  );
 }
 
 export interface ExternalMeasurement {
@@ -148,6 +176,7 @@ export interface NoiseEvent {
   backgroundRecordingId?: string;
   deletedAt?: string;
   correctionHistory?: NoiseEventCorrection[];
+  audioAnalysis?: AudioAnalysis;
 }
 
 export interface NoiseEventDraft {
@@ -254,6 +283,7 @@ export function isNoiseEvent(value: unknown): value is NoiseEvent {
     (event.backgroundRecordingId === undefined || typeof event.backgroundRecordingId === 'string') &&
     (event.deletedAt === undefined ||
       (typeof event.deletedAt === 'string' && Number.isFinite(Date.parse(event.deletedAt)))) &&
-    (event.correctionHistory === undefined || isCorrectionHistory(event.correctionHistory))
+    (event.correctionHistory === undefined || isCorrectionHistory(event.correctionHistory)) &&
+    (event.audioAnalysis === undefined || isAudioAnalysis(event.audioAnalysis))
   );
 }

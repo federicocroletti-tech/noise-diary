@@ -57,6 +57,27 @@ describe('NoiseStorageService', () => {
     expect(events[0].attachmentIds).toEqual([]);
   });
 
+  it('keeps a valid audio analysis across save and load and rejects a malformed one', async () => {
+    const storage = await createStorage();
+    const [base] = storage.parseImport(JSON.parse(JSON.stringify(importTemplate)));
+    const analysis = {
+      clipId: 'clip-1',
+      sha256: 'a'.repeat(64),
+      createdAt: '2026-10-25T00:00:00.000Z',
+      sampleRate: 48000,
+      dominantFrequencies: [1000],
+      bands: [{ label: '1000–2000 Hz', amplitude: 1 }],
+    };
+
+    await storage.saveEvents([{ ...base, audioAnalysis: analysis }]);
+    expect((await storage.loadEvents())[0].audioAnalysis).toEqual(analysis);
+
+    await expect(
+      storage.saveEvents([{ ...base, audioAnalysis: { ...analysis, sha256: 'not-a-hash' } }]),
+    ).rejects.toThrow('analisi delle frequenze');
+    expect((await storage.loadEvents())[0].audioAnalysis).toEqual(analysis);
+  });
+
   afterEach(async () => {
     repositories.splice(0).forEach((repository) => repository.close());
     vaults.splice(0).forEach((vault) => vault.lock());
