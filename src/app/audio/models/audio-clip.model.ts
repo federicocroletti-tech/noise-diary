@@ -1,4 +1,5 @@
 export type AudioClipKind = 'event' | 'background';
+export type AudioClipOrigin = 'microphone' | 'file';
 
 export interface AudioClip {
   id: string;
@@ -11,7 +12,7 @@ export interface AudioClip {
   durationMs: number;
   createdAt: string;
   sha256: string;
-  origin: 'microphone';
+  origin: AudioClipOrigin;
   device: {
     platform: string;
   };
@@ -43,7 +44,7 @@ export function isAudioClipMetadata(value: unknown): value is AudioClipMetadata 
     Number.isFinite(Date.parse(metadata['createdAt'])) &&
     typeof metadata['sha256'] === 'string' &&
     /^[a-f0-9]{64}$/i.test(metadata['sha256']) &&
-    metadata['origin'] === 'microphone' &&
+    (metadata['origin'] === 'microphone' || metadata['origin'] === 'file') &&
     device !== null &&
     typeof device === 'object' &&
     'platform' in device &&

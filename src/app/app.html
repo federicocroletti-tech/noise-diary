@@ -1158,8 +1158,8 @@
               <p>
                 {{
                   accountMode() === 'signed-in'
-                    ? 'Acquisite dal microfono e caricate nello storage privato del tuo account. Non sono cifrate end-to-end.'
-                    : 'Acquisite dal microfono e conservate solo in questo browser.'
+                    ? 'Acquisite dal microfono o allegate da file, e caricate nello storage privato del tuo account. Non sono cifrate end-to-end.'
+                    : 'Acquisite dal microfono o allegate da file, e conservate solo in questo browser.'
                 }}
               </p>
             </div>
@@ -1231,6 +1231,22 @@
                 Ferma e salva
               </button>
             </ng-container>
+            <button
+              *ngIf="!recordingActive()"
+              type="button"
+              class="secondary"
+              (click)="audioFileInput.click()"
+              [attr.aria-label]="'Allega un file audio già registrato per ' + event.locationLabel"
+            >
+              Allega file audio
+            </button>
+            <input
+              #audioFileInput
+              type="file"
+              accept="audio/*,.m4a,.opus,.flac"
+              hidden
+              (change)="attachAudioFile($event)"
+            />
           </div>
 
           <p *ngIf="audioStatus()" class="audio-status" role="status" aria-live="polite">
@@ -1258,7 +1274,12 @@
                   SHA-256: <code>{{ clip.sha256 }}</code>
                 </p>
                 <p>
-                  Origine: microfono · piattaforma: {{ clip.device.platform || 'non disponibile' }}
+                  Origine:
+                  {{
+                    clip.origin === 'file'
+                      ? 'file audio allegato dall’utente'
+                      : 'microfono · piattaforma: ' + (clip.device.platform || 'non disponibile')
+                  }}
                 </p>
               </details>
               <div class="audio-file-actions">

@@ -4,6 +4,7 @@ import { LocalVaultService } from '../services/local-vault.service';
 import {
   calculateSha256,
   chooseSupportedAudioMimeType,
+  createAudioClipFromFile,
   formatRecordingError,
   MAX_RECORDING_DURATION_SECONDS,
   MAX_RECORDING_SIZE_BYTES,
@@ -48,6 +49,56 @@ describe('audio recording helpers', () => {
 
     expect(hash).toMatch(/^[a-f0-9]{64}$/);
     expect(await fixture.text()).toBe(before);
+  });
+
+  it('builds an attached clip from a user-provided audio file with its hash and duration', async () => {
+    const file = new File(['synthetic attached audio'], 'vicino.m4a', {
+      type: '',
+      lastModified: Date.UTC(2026, 10, 18, 20, 0),
+    });
+
+    const clip = await createAudioClipFromFile(file, {
+      eventId: 'event-1',
+      kind: 'background',
+      readDurationMs: async () => 4250,
+    });
+
+    expect(clip).toMatchObject({
+      eventId: 'event-1',
+      kind: 'background',
+      fileName: 'vicino.m4a',
+      mimeType: 'audio/mp4',
+      sizeBytes: file.size,
+      durationMs: 4250,
+      origin: 'file',
+      createdAt: '2026-11-18T20:00:00.000Z',
+    });
+    expect(clip.sha256).toBe(await calculateSha256(file));
+    expect(await clip.blob.text()).toBe('synthetic attached audio');
+  });
+
+  it('rejects attached files that are not audio, empty, or over the size limit', async () => {
+    const readDurationMs = async () => 1000;
+
+    await expect(
+      createAudioClipFromFile(new File(['x'], 'nota.txt', { type: 'text/plain' }), {
+        eventId: 'event-1',
+        kind: 'event',
+        readDurationMs,
+      }),
+    ).rejects.toThrow('Formato non supportato');
+    await expect(
+      createAudioClipFromFile(new File([], 'vuoto.wav', { type: 'audio/wav' }), {
+        eventId: 'event-1',
+        kind: 'event',
+        readDurationMs,
+      }),
+    ).rejects.toThrow('vuoto');
+    const oversized = new File(['x'], 'grande.mp3', { type: 'audio/mpeg' });
+    Object.defineProperty(oversized, 'size', { value: MAX_RECORDING_SIZE_BYTES + 1 });
+    await expect(
+      createAudioClipFromFile(oversized, { eventId: 'event-1', kind: 'event', readDurationMs }),
+    ).rejects.toThrow('50 MB');
   });
 
   it('records a synthetic microphone fixture and persists its original blob and hash locally', async () => {
