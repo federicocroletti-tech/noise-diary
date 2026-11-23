@@ -787,6 +787,10 @@
                 </small>
               </label>
             </div>
+            <app-plan-point-picker
+              [initialPoint]="draftPlanPoint()"
+              (pointChange)="setDraftPlanPoint($event)"
+            ></app-plan-point-picker>
           </fieldset>
 
           <fieldset class="field-group">

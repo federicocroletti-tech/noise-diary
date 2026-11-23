@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { AudioClipRepository } from './audio/audio-clip.repository';
 import { LocalVaultService } from './services/local-vault.service';
@@ -12,6 +13,7 @@ import { NoiseEvent } from './domain/noise-event.model';
 import { AudioClip } from './audio/models/audio-clip.model';
 import { App } from './app';
 import { routes } from './app.routes';
+import { PlanPoint, PlanPointPicker } from './floor-map/plan-point-picker';
 
 describe('App', () => {
   const defaultProfile: LocalDiaryProfile = {
@@ -916,6 +918,80 @@ describe('App', () => {
     expect(compiled.querySelector('.event-list .event-header span')?.textContent?.trim()).toBe(
       'Ronzio',
     );
+  });
+
+  it('saves a selected plan point with the episode', async () => {
+    const fixture = await createLocalFixture();
+    await createVault(fixture);
+    clickButton(fixture, 'Nuovo episodio');
+
+    const picker = fixture.debugElement.query(By.directive(PlanPointPicker))
+      .componentInstance as PlanPointPicker;
+    const point: PlanPoint = { x: 0.25, y: 0.75, planId: 'room-apartment' };
+    picker.pointChange.emit(point);
+    fixture.detectChanges();
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.submit')?.click();
+    await fixture.whenStable();
+
+    expect(savedEvents.mock.calls[0][0][0]).toMatchObject({
+      planX: point.x,
+      planY: point.y,
+      planId: point.planId,
+    });
+  });
+
+  it('removes a cleared plan point when correcting an episode', async () => {
+    const existingEvent = {
+      id: 'event-with-plan-point',
+      startedAt: '2026-10-22T22:04:00.000Z',
+      createdAt: '2026-10-22T22:05:00.000Z',
+      updatedAt: '2026-10-22T22:05:00.000Z',
+      locationLabel: 'Test location',
+      room: 'Soggiorno',
+      planX: 0.25,
+      planY: 0.75,
+      planId: 'room-apartment',
+      eventType: 'UNKNOWN',
+      continuityType: 'unknown',
+      perceivedIntensity: 2,
+      perceivedEffects: ['simple-observation'],
+      suspectedSource: 'Non identificata (ipotesi)',
+      description: 'Descrizione precedente.',
+      notes: '',
+      status: 'to-review',
+      tags: [],
+      attachmentIds: [],
+    };
+    storage.loadEvents.mockResolvedValue([existingEvent]);
+    const fixture = await createLocalFixture();
+    await createVault(fixture);
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    compiled.querySelector<HTMLButtonElement>('button[aria-label="Modifica episodio"]')?.click();
+    fixture.detectChanges();
+    const picker = fixture.debugElement.query(By.directive(PlanPointPicker))
+      .componentInstance as PlanPointPicker;
+    picker.pointChange.emit(null);
+    const reason = compiled.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-describedby="correction-reason-help"]',
+    );
+    if (!reason) {
+      throw new Error('Correction reason field is missing.');
+    }
+    reason.value = 'Rimozione del punto errato.';
+    reason.dispatchEvent(new Event('input', { bubbles: true }));
+    compiled.querySelector<HTMLButtonElement>('.event-form button[type="submit"]')?.click();
+    await fixture.whenStable();
+
+    const updatedEvent = savedEvents.mock.calls[0][0][0];
+    expect(updatedEvent).not.toHaveProperty('planX');
+    expect(updatedEvent).not.toHaveProperty('planY');
+    expect(updatedEvent).not.toHaveProperty('planId');
+    expect(JSON.parse(updatedEvent.correctionHistory[0].previousSnapshot)).toMatchObject({
+      planX: existingEvent.planX,
+      planY: existingEvent.planY,
+      planId: existingEvent.planId,
+    });
   });
 
   it('saves an edit with its reason and previous event snapshot', async () => {
