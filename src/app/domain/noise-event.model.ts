@@ -153,6 +153,9 @@ export interface NoiseEvent {
 export interface NoiseEventDraft {
   locationLabel: string;
   room: string;
+  planX?: number;
+  planY?: number;
+  planId?: string;
   eventType: NoiseEventType;
   continuityType: ContinuityType;
   perceivedIntensity: number;

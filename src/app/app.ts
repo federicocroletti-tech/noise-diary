@@ -11,6 +11,7 @@ import {
   effect,
 } from '@angular/core';
 import { MapContext } from './floor-map/map-context.service';
+import { PlanPoint, PlanPointPicker } from './floor-map/plan-point-picker';
 import { AudioClip, AudioClipKind } from './audio/models/audio-clip.model';
 import { AudioClipRepository } from './audio/audio-clip.repository';
 import {
@@ -126,7 +127,7 @@ const EMPTY_DRAFT: NoiseEventDraft = {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterOutlet],
+  imports: [CommonModule, RouterLink, RouterOutlet, PlanPointPicker],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   host: {
@@ -184,6 +185,12 @@ export class App implements OnDestroy {
   protected readonly search = signal('');
   protected readonly sortMode = signal<SortMode>('recent');
   protected readonly draft = signal<NoiseEventDraft>({ ...EMPTY_DRAFT });
+  protected readonly draftPlanPoint = computed<PlanPoint | null>(() => {
+    const draft = this.draft();
+    return draft.planX === undefined || draft.planY === undefined
+      ? null
+      : { x: draft.planX, y: draft.planY, planId: draft.planId };
+  });
   protected readonly events = signal<NoiseEvent[]>([]);
   protected readonly selectedEventId = signal<string | null>(null);
   protected readonly audioClips = signal<AudioClip[]>([]);
@@ -1130,6 +1137,9 @@ export class App implements OnDestroy {
     this.draft.set({
       locationLabel: event.locationLabel,
       room: event.room,
+      planX: event.planX,
+      planY: event.planY,
+      planId: event.planId,
       eventType: event.eventType,
       continuityType: event.continuityType,
       perceivedIntensity: event.perceivedIntensity ?? 3,
@@ -1232,6 +1242,23 @@ export class App implements OnDestroy {
     this.draft.update((current) => ({ ...current, [field]: value }));
   }
 
+  protected setDraftPlanPoint(point: PlanPoint | null): void {
+    this.draft.update((current) => {
+      const { planX: _planX, planY: _planY, planId: _planId, ...rest } = current;
+      return point ? { ...rest, planX: point.x, planY: point.y, planId: point.planId } : rest;
+    });
+  }
+
+  private planPointFields(draft: NoiseEventDraft): Pick<NoiseEvent, 'planX' | 'planY' | 'planId'> {
+    return draft.planX === undefined || draft.planY === undefined
+      ? {}
+      : {
+          planX: draft.planX,
+          planY: draft.planY,
+          ...(draft.planId ? { planId: draft.planId } : {}),
+        };
+  }
+
   protected async submitDraft(): Promise<void> {
     const draft = this.draft();
     const editingId = this.editingEventId();
@@ -1278,8 +1305,10 @@ export class App implements OnDestroy {
         reason,
         previousSnapshot: JSON.stringify(previousSnapshot),
       };
+      const { planX: _planX, planY: _planY, planId: _planId, ...eventWithoutPlanPoint } = existingEvent;
       event = {
-        ...existingEvent,
+        ...eventWithoutPlanPoint,
+        ...this.planPointFields(draft),
         startedAt,
         endedAt,
         duration: durationSeconds,
@@ -1322,6 +1351,7 @@ export class App implements OnDestroy {
         updatedAt: timestamp,
         locationLabel: draft.locationLabel.trim(),
         room: draft.room.trim(),
+        ...this.planPointFields(draft),
         microphonePosition: draft.microphonePosition.trim() || undefined,
         windowsState: draft.windowsState.trim() || undefined,
         doorsState: draft.doorsState.trim() || undefined,
